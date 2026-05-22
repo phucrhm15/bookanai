@@ -1,8 +1,10 @@
-import { AGENTS, type Agent } from "@/lib/mock-data";
+import { useMemo, useState } from "react";
+import { AGENTS, AGENT_SERVICES_COUNT, type Agent } from "@/lib/mock-data";
 import { useActiveAgent } from "@/lib/agent-store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Check, Search, Sparkles, Zap } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,30 +20,64 @@ const accentMap: Record<Agent["accent"], string> = {
 export function Marketplace() {
   const { activeAgent, setActiveAgent } = useActiveAgent();
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return AGENTS;
+    return AGENTS.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        a.handle.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q) ||
+        a.description.toLowerCase().includes(q),
+    );
+  }, [query]);
 
   const onSelect = (agent: Agent) => {
     setActiveAgent(agent);
     toast.success(`${agent.name} is now active`, {
-      description: `${agent.price} USDC per generation`,
+      description: `${agent.price} USDC per request`,
     });
   };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
-      <header className="mb-8 flex flex-col gap-2 md:mb-10">
-        <Badge variant="outline" className="w-fit border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
-          Marketplace
-        </Badge>
+      <header className="mb-6 flex flex-col gap-3 md:mb-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
+            Marketplace
+          </Badge>
+          <Badge variant="outline" className="gap-1 border-border/60 bg-card/60 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <Zap className="h-3 w-3 text-primary" />
+            Powered by <span className="text-foreground">agents.circle.com/services</span>
+          </Badge>
+        </div>
         <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
           Hire an <span className="text-gradient-neon">AI Agent</span>
         </h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Autonomous agents that post on X and pay per inference using Circle nanopayments. Select one to start generating in your Studio.
+          Autonomous agents that post on X and pay per inference using x402 nanopayments. Select one to start generating in your Studio.
         </p>
       </header>
 
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Search ${AGENT_SERVICES_COUNT}+ Agent Services…`}
+            className="border-border/60 bg-card/60 pl-9 font-mono text-sm placeholder:text-muted-foreground/70"
+          />
+        </div>
+        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {filtered.length} of {AGENT_SERVICES_COUNT}+ endpoints
+        </div>
+      </div>
+
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {AGENTS.map((agent) => {
+        {filtered.map((agent) => {
           const active = activeAgent.id === agent.id;
           return (
             <article
@@ -77,7 +113,7 @@ export function Marketplace() {
                 <div className="flex items-baseline gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1">
                   <span className="font-mono text-sm font-bold text-primary">{agent.price}</span>
                   <span className="font-mono text-[10px] uppercase tracking-wider text-primary/70">
-                    USDC / prompt
+                    USDC / request
                   </span>
                 </div>
                 <Button
@@ -113,6 +149,12 @@ export function Marketplace() {
             </article>
           );
         })}
+
+        {filtered.length === 0 && (
+          <div className="col-span-full rounded-xl border border-dashed border-border/60 bg-card/40 p-10 text-center text-sm text-muted-foreground">
+            No agents match "{query}". Try another keyword.
+          </div>
+        )}
       </div>
     </div>
   );

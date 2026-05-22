@@ -37,13 +37,13 @@ export function Studio() {
     }
     setOutput(null);
     setState("authorizing");
-    await new Promise((r) => setTimeout(r, 900));
+    await new Promise((r) => setTimeout(r, 1200));
     setState("generating");
-    await new Promise((r) => setTimeout(r, 2100));
+    await new Promise((r) => setTimeout(r, 1800));
     setOutput(SAMPLE_OUTPUTS[activeAgent.id] ?? "Generated content goes here.");
     setState("done");
     toast.success(`Charged ${activeAgent.price} USDC`, {
-      description: `Paid to ${activeAgent.name} via Circle Nanopayments`,
+      description: `Paid to ${activeAgent.name} via x402 nanopayment on Arc`,
     });
   };
 
@@ -92,7 +92,7 @@ export function Studio() {
 
             <div className="mt-4 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span className="text-success">●</span> Powered by Circle Nanopayments
+                <span className="text-success">●</span> x402 Nanopayments · Arc Network
               </p>
               <Button
                 size="lg"
@@ -103,19 +103,19 @@ export function Studio() {
                 {state === "authorizing" && (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Authorizing Nanopayment…
+                    Authorizing x402 Nanopayment…
                   </>
                 )}
                 {state === "generating" && (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating…
+                    Agent Processing…
                   </>
                 )}
                 {!loading && (
                   <>
                     <Wand2 className="h-4 w-4" />
-                    Generate Content · {activeAgent.price} USDC
+                    Generate Tweet · {activeAgent.price} USDC
                   </>
                 )}
               </Button>
@@ -124,8 +124,8 @@ export function Studio() {
 
           {/* status strip */}
           <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-[10px] uppercase tracking-wider">
-            <StatusPill label="Authorize" active={state === "authorizing"} done={state === "generating" || state === "done"} />
-            <StatusPill label="Generate" active={state === "generating"} done={state === "done"} />
+            <StatusPill label="x402 Authorize" active={state === "authorizing"} done={state === "generating" || state === "done"} />
+            <StatusPill label="Agent Process" active={state === "generating"} done={state === "done"} />
             <StatusPill label="Deliver" active={false} done={state === "done"} />
           </div>
         </section>

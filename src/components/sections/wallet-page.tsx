@@ -9,7 +9,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { MOCK_BALANCE, MOCK_WALLET_ADDRESS, TRANSACTIONS } from "@/lib/mock-data";
+import {
+  ARC_NETWORK,
+  MOCK_BALANCE,
+  MOCK_WALLET_ADDRESS,
+  TRANSACTIONS,
+  USDC_CONTRACT_ADDRESS,
+} from "@/lib/mock-data";
 import { ArrowDownLeft, ArrowUpRight, Check, Copy, Shield, Zap } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,8 +27,11 @@ export function WalletPage() {
           Wallet & Billing
         </Badge>
         <h1 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Agent <span className="text-gradient-neon">Embedded Wallet</span>
+          Your <span className="text-gradient-neon">Invisible Wallet</span>
         </h1>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          A unified USDC balance auto-managed for you. No seed phrases, no popups — just spend.
+        </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -43,10 +52,10 @@ function WalletCard() {
         <div className="relative">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              USDC Balance
+              Unified Balance
             </span>
             <Badge variant="outline" className="gap-1 border-success/40 bg-success/10 font-mono text-[10px] text-success">
-              <span className="h-1.5 w-1.5 rounded-full bg-success" /> Active
+              <span className="h-1.5 w-1.5 rounded-full bg-success" /> {ARC_NETWORK.name} · ID {ARC_NETWORK.id}
             </Badge>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
@@ -56,7 +65,7 @@ function WalletCard() {
             <span className="font-mono text-sm text-primary">USDC</span>
           </div>
           <div className="mt-1 font-mono text-xs text-muted-foreground">
-            ≈ ${MOCK_BALANCE.toFixed(2)} USD · Polygon
+            ≈ ${MOCK_BALANCE.toFixed(2)} USD · Unified Balance
           </div>
 
           <div className="mt-5 flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-2">
@@ -77,7 +86,7 @@ function WalletCard() {
           <div className="mt-6 flex items-center gap-2 border-t border-border/60 pt-4">
             <Zap className="h-3.5 w-3.5 text-primary" />
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Powered by <span className="text-primary">Circle Nanopayments</span>
+              Powered by <span className="text-primary">Circle Programmable Wallets</span>
             </span>
           </div>
         </div>
@@ -94,11 +103,11 @@ function CopyButton({ value }: { value: string }) {
       onClick={() => {
         navigator.clipboard.writeText(value);
         setCopied(true);
-        toast.success("Address copied");
+        toast.success("Copied to clipboard");
         setTimeout(() => setCopied(false), 1500);
       }}
       className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-primary/10 hover:text-primary"
-      aria-label="Copy address"
+      aria-label="Copy"
     >
       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
@@ -110,14 +119,14 @@ function DepositDialog() {
     <Dialog>
       <DialogTrigger asChild>
         <Button className="bg-gradient-neon text-neon-foreground hover:opacity-90">
-          <ArrowDownLeft className="h-4 w-4" /> Deposit
+          <ArrowDownLeft className="h-4 w-4" /> Deposit USDC
         </Button>
       </DialogTrigger>
       <DialogContent className="border-primary/30 bg-card/95 backdrop-blur-xl">
         <DialogHeader>
           <DialogTitle className="font-display">Deposit USDC</DialogTitle>
           <DialogDescription>
-            Send USDC (Polygon) to your embedded agent wallet. Funds appear within seconds.
+            Send USDC on {ARC_NETWORK.name} (ID {ARC_NETWORK.id}) to your wallet. Funds appear within seconds.
           </DialogDescription>
         </DialogHeader>
 
@@ -125,17 +134,29 @@ function DepositDialog() {
           <div className="rounded-xl border border-primary/30 bg-background p-4 shadow-neon">
             <FakeQR />
           </div>
+
           <div className="w-full">
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Wallet Address
+              Your Wallet Address
             </div>
             <div className="mt-1 flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-2">
               <span className="truncate font-mono text-xs">{MOCK_WALLET_ADDRESS}</span>
               <CopyButton value={MOCK_WALLET_ADDRESS} />
             </div>
           </div>
+
+          <div className="w-full">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              USDC Contract Address
+            </div>
+            <div className="mt-1 flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+              <span className="truncate font-mono text-xs text-primary">{USDC_CONTRACT_ADDRESS}</span>
+              <CopyButton value={USDC_CONTRACT_ADDRESS} />
+            </div>
+          </div>
+
           <div className="w-full rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
-            Only send <span className="font-semibold text-foreground">USDC on Polygon</span>. Other assets will be lost.
+            Only send <span className="font-semibold text-foreground">USDC on {ARC_NETWORK.name}</span>. Other assets will be lost.
           </div>
         </div>
       </DialogContent>
@@ -144,12 +165,10 @@ function DepositDialog() {
 }
 
 function FakeQR() {
-  // deterministic pseudo-random QR pattern
   const size = 21;
   const cells = Array.from({ length: size * size }, (_, i) => {
     const x = i % size;
     const y = Math.floor(i / size);
-    // corners (finder patterns)
     const inCorner =
       (x < 7 && y < 7) || (x >= size - 7 && y < 7) || (x < 7 && y >= size - 7);
     if (inCorner) {
@@ -184,7 +203,7 @@ function TransactionHistory() {
           <div>
             <h2 className="font-display text-lg font-semibold">Transaction History</h2>
             <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              On-chain · Circle USDC
+              x402 Nanopayments · Arc Network
             </p>
           </div>
           <Badge variant="outline" className="font-mono text-[10px]">
@@ -208,7 +227,14 @@ function TransactionHistory() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{tx.label}</div>
-                  <div className="font-mono text-[11px] text-muted-foreground">{tx.timestamp}</div>
+                  <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <span>{tx.timestamp}</span>
+                    {tx.kind === "nanopayment" && (
+                      <span className="rounded-sm border border-primary/30 bg-primary/5 px-1 py-px text-[9px] uppercase tracking-wider text-primary">
+                        x402
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div
                   className={`font-mono text-sm font-semibold ${
@@ -216,7 +242,7 @@ function TransactionHistory() {
                   }`}
                 >
                   {positive ? "+" : ""}
-                  {tx.amount.toFixed(2)} <span className="text-muted-foreground">USDC</span>
+                  {tx.amount.toFixed(3)} <span className="text-muted-foreground">USDC</span>
                 </div>
               </li>
             );

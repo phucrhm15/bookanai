@@ -11,8 +11,8 @@ const accentMap: Record<Agent["accent"], string> = {
   cyan: "from-primary/30 to-primary/0 text-primary",
   magenta: "from-magenta/30 to-magenta/0 text-magenta",
   lime: "from-success/30 to-success/0 text-success",
-  amber: "from-chart-4/30 to-transparent text-chart-4",
-  violet: "from-accent/40 to-transparent text-foreground",
+  amber: "from-magenta/20 to-transparent text-magenta",
+  violet: "from-accent/60 to-transparent text-foreground",
 };
 
 export function Marketplace() {

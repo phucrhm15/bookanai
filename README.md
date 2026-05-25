@@ -58,6 +58,10 @@ npm run cron:settle        # chuyển user→master on-chain (hoặc cron HTTP)
 
 `GET /api/master/status` — cần header `Authorization: Bearer <SETTLEMENT_CRON_SECRET>` trên production.
 
+## Host miễn phí (0 đồng server)
+
+**Hướng dẫn từng bước:** [FREE-HOSTING.md](./FREE-HOSTING.md) — Render Free + Clerk free (SQLite trên Render free có thể reset sau redeploy).
+
 ## Triển khai lên Internet (production)
 
 **Hướng dẫn đầy đủ:** [DEPLOY.md](./DEPLOY.md) (VPS + HTTPS, Render, Clerk, cron).

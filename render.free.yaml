@@ -1,0 +1,36 @@
+# Render FREE — không cần thẻ (Hobby plan)
+# Hạn chế: web sleep sau 15 phút; SQLite MẤT khi redeploy/restart (không có persistent disk).
+# Dùng để demo landing + đăng nhập; không phù hợp production ví/ledger lâu dài.
+#
+# Deploy: Dashboard → New → Blueprint → chọn repo → dùng file render.free.yaml
+# Hoặc: New → Web Service → Docker → Instance type: Free (xem FREE-HOSTING.md)
+services:
+  - type: web
+    name: nano-agent-free
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/tmp/bookanai.db
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CIRCLE_API_KEY
+        sync: false
+      - key: ENTITY_SECRET
+        sync: false
+      - key: CIRCLE_WALLET_SET_ID
+        sync: false
+      - key: MASTER_AGENT_PRIVATE_KEY
+        sync: false
+      - key: X402_DISCOVERY_URL
+        value: https://api.circle.com/v2/x402/discovery/resources
+      - key: SETTLEMENT_CRON_SECRET
+        generateValue: true
+      - key: BASE_RPC_URL
+        value: https://mainnet.base.org

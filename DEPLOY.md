@@ -2,6 +2,8 @@
 
 Hướng dẫn đưa **toàn bộ website** (landing, đăng nhập Clerk, Marketplace, Studio, Wallet, API x402, SQLite) lên production.
 
+> **Host 0 đồng:** xem [FREE-HOSTING.md](./FREE-HOSTING.md) (Render Free — không cần thẻ; Oracle VPS free mãi nếu cần lưu SQLite lâu dài).
+
 ## Chọn nền tảng
 
 | Cách | Phù hợp | SQLite / ledger |

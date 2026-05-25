@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const Database = require("better-sqlite3") as typeof import("better-sqlite3").default;
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import * as schema from "@/server/db/schema";

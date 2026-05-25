@@ -1,6 +1,7 @@
 /**
  * Production HTTP for Render/VPS — listen immediately, lazy-load worker (saves RAM on 512MB).
  */
+import "./polyfill-cjs-globals.mjs";
 import { createServer } from "node:http";
 import fs from "node:fs";
 import path from "node:path";

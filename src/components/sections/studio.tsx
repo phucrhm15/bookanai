@@ -176,11 +176,17 @@ export function Studio() {
                 <span className="text-success">●</span>{" "}
                 {t("studio.footerLine", { network: BASE_NETWORK.name })}
               </p>
+              {!wallet?.walletId && !loading ? (
+                <p className="text-xs text-magenta sm:hidden">
+                  {t("studio.walletNotLoaded")}
+                </p>
+              ) : null}
               <Button
                 size="lg"
                 onClick={run}
                 disabled={loading || !wallet?.walletId}
-                className="bg-gradient-neon text-neon-foreground shadow-neon hover:opacity-90"
+                title={!wallet?.walletId ? t("studio.walletNotLoaded") : undefined}
+                className="bg-gradient-neon text-neon-foreground shadow-neon hover:opacity-90 disabled:opacity-50"
               >
                 {state === "authorizing" && (
                   <>

@@ -1,18 +1,68 @@
 /**
- * Production HTTP server for Render/VPS — serves the built TanStack worker on Node.
- * Faster startup than `vite dev` (avoids Render health-check timeout).
+ * Production HTTP server for Render/VPS.
+ * 1) Serves built client assets from dist/client (CSS/JS)
+ * 2) Delegates everything else to the TanStack worker bundle
  */
 import { createServer } from "node:http";
-import { Readable } from "node:stream";
+import fs from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || "0.0.0.0";
 const root = path.dirname(fileURLToPath(import.meta.url));
-const entry = pathToFileURL(path.join(root, "..", "dist", "server", "index.js")).href;
+const appRoot = path.join(root, "..");
+const clientRoot = path.join(appRoot, "dist", "client");
+const entry = pathToFileURL(path.join(appRoot, "dist", "server", "index.js")).href;
 
 const { default: handler } = await import(entry);
+
+const MIME = {
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".map": "application/json",
+};
+
+function tryServeStatic(pathname, res) {
+  if (
+    !pathname.startsWith("/assets/") &&
+    pathname !== "/favicon.ico" &&
+    !pathname.startsWith("/fonts/")
+  ) {
+    return false;
+  }
+
+  const relative = pathname.startsWith("/") ? pathname.slice(1) : pathname;
+  const filePath = path.resolve(clientRoot, relative);
+  const clientResolved = path.resolve(clientRoot);
+
+  if (filePath !== clientResolved && !filePath.startsWith(`${clientResolved}${path.sep}`)) {
+    return false;
+  }
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return false;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const body = fs.readFileSync(filePath);
+  res.statusCode = 200;
+  res.setHeader("content-type", MIME[ext] ?? "application/octet-stream");
+  res.setHeader("cache-control", "public, max-age=31536000, immutable");
+  res.end(body);
+  return true;
+}
 
 function toWebRequest(req) {
   const hostHeader = req.headers.host ?? `localhost:${port}`;
@@ -45,6 +95,12 @@ async function writeResponse(webRes, res) {
 
 const server = createServer(async (req, res) => {
   try {
+    const pathname = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`).pathname;
+
+    if (req.method === "GET" || req.method === "HEAD") {
+      if (tryServeStatic(pathname, res)) return;
+    }
+
     const response = await handler.fetch(toWebRequest(req), process.env, {
       waitUntil: (promise) => {
         promise.catch((err) => console.error("[waitUntil]", err));
@@ -62,5 +118,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
+  const hasClient = fs.existsSync(clientRoot);
   console.log(`[serve-worker] listening on http://${host}:${port}`);
+  console.log(`[serve-worker] client assets: ${hasClient ? clientRoot : "MISSING — run npm run build"}`);
 });

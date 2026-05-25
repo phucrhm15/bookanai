@@ -54,7 +54,11 @@ Trên Render → **Settings** → **Health Checks**:
 
 Deploy lại commit mới nhất.
 
-## 7. Sau khi Live
+## 7. Trang trắng / không có CSS (app không hiện đủ)
+
+SSR chạy nhưng `/assets/*.css` và `/assets/*.js` bị 404 → cần `serve-worker.mjs` phục vụ `dist/client` (đã sửa). Deploy commit mới.
+
+## 8. Sau khi Live
 
 - URL: `https://bookanai.onrender.com` (hoặc URL Render cấp)
 - Clerk: thêm domain + `/sign-in`, `/sign-up`, `/marketplace`

@@ -15,6 +15,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
 
 RUN npm rebuild better-sqlite3
+# Dashboard env vars (incl. VITE_CLERK_PUBLISHABLE_KEY) are available during Render Docker builds
 RUN npm run build
 
 ENV NODE_ENV=production

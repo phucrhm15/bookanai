@@ -1,15 +1,20 @@
-# Self-host: Node 20 + SQLite on /data. Full stack (SSR + API + better-sqlite3).
-# Cloudflare Workers: `npm run deploy` — SQLite not supported without D1 migration.
+# Render / VPS — Node 20 + SQLite (better-sqlite3 native build)
 FROM node:20-bookworm-slim
 
-RUN apt-get update && apt-get install -y python3 make g++ curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ curl \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+
+# Render free build VMs are memory-tight — skip lifecycle scripts until rebuild step
+ENV NODE_OPTIONS=--max-old-space-size=1024
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
+
 RUN npm rebuild better-sqlite3
 
 ENV NODE_ENV=production
@@ -18,9 +23,8 @@ ENV PORT=3000
 ENV DATABASE_URL=file:/data/bookanai.db
 
 EXPOSE 3000
-VOLUME ["/data"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
-  CMD curl -f http://127.0.0.1:3000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+  CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-3000}/api/health" || exit 1'
 
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "scripts/start-prod.mjs"]

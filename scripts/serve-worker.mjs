@@ -1,7 +1,5 @@
 /**
- * Production HTTP server for Render/VPS.
- * 1) Serves built client assets from dist/client (CSS/JS)
- * 2) Delegates everything else to the TanStack worker bundle
+ * Production HTTP for Render/VPS — listen immediately, lazy-load worker (saves RAM on 512MB).
  */
 import { createServer } from "node:http";
 import fs from "node:fs";
@@ -16,7 +14,25 @@ const appRoot = path.join(root, "..");
 const clientRoot = path.join(appRoot, "dist", "client");
 const entry = pathToFileURL(path.join(appRoot, "dist", "server", "index.js")).href;
 
-const { default: handler } = await import(entry);
+let handlerPromise;
+let handlerError;
+
+function getHandler() {
+  if (handlerError) return Promise.reject(handlerError);
+  if (!handlerPromise) {
+    handlerPromise = import(entry)
+      .then((mod) => {
+        console.log("[serve-worker] app bundle loaded");
+        return mod.default;
+      })
+      .catch((err) => {
+        handlerError = err;
+        console.error("[serve-worker] failed to load app bundle:", err);
+        throw err;
+      });
+  }
+  return handlerPromise;
+}
 
 const MIME = {
   ".css": "text/css; charset=utf-8",
@@ -64,6 +80,22 @@ function tryServeStatic(pathname, res) {
   return true;
 }
 
+function sendHealth(res) {
+  const hasClient = fs.existsSync(clientRoot);
+  const hasServer = fs.existsSync(path.join(appRoot, "dist", "server", "index.js"));
+  res.statusCode = 200;
+  res.setHeader("content-type", "application/json; charset=utf-8");
+  res.end(
+    JSON.stringify({
+      ok: true,
+      hasClientAssets: hasClient,
+      hasServerBundle: hasServer,
+      bundleLoaded: Boolean(handlerPromise && !handlerError),
+      timestamp: new Date().toISOString(),
+    }),
+  );
+}
+
 function toWebRequest(req) {
   const hostHeader = req.headers.host ?? `localhost:${port}`;
   const url = `http://${hostHeader}${req.url ?? "/"}`;
@@ -87,20 +119,39 @@ async function writeResponse(webRes, res) {
     res.setHeader(key, value);
   });
   if (webRes.body) {
-    Readable.fromWeb(webRes.body).pipe(res);
+    const stream = Readable.fromWeb(webRes.body);
+    stream.on("error", (err) => {
+      console.error("[serve-worker] response stream error:", err);
+      if (!res.headersSent) res.statusCode = 500;
+      res.end();
+    });
+    stream.pipe(res);
   } else {
     res.end();
   }
 }
 
+process.on("uncaughtException", (err) => {
+  console.error("[serve-worker] uncaughtException:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("[serve-worker] unhandledRejection:", err);
+});
+
 const server = createServer(async (req, res) => {
   try {
     const pathname = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`).pathname;
+
+    if (pathname === "/api/health" && (req.method === "GET" || req.method === "HEAD")) {
+      sendHealth(res);
+      return;
+    }
 
     if (req.method === "GET" || req.method === "HEAD") {
       if (tryServeStatic(pathname, res)) return;
     }
 
+    const handler = await getHandler();
     const response = await handler.fetch(toWebRequest(req), process.env, {
       waitUntil: (promise) => {
         promise.catch((err) => console.error("[waitUntil]", err));
@@ -108,17 +159,18 @@ const server = createServer(async (req, res) => {
     });
     await writeResponse(response, res);
   } catch (err) {
-    console.error("[serve-worker]", err);
+    console.error("[serve-worker] request error:", err);
     if (!res.headersSent) {
-      res.statusCode = 500;
+      res.statusCode = handlerError ? 503 : 500;
       res.setHeader("content-type", "text/plain; charset=utf-8");
-      res.end("Internal Server Error");
+      res.end(handlerError ? "App is starting or failed to load. Retry in a moment." : "Internal Server Error");
     }
   }
 });
 
 server.listen(port, host, () => {
-  const hasClient = fs.existsSync(clientRoot);
   console.log(`[serve-worker] listening on http://${host}:${port}`);
-  console.log(`[serve-worker] client assets: ${hasClient ? clientRoot : "MISSING — run npm run build"}`);
+  console.log(`[serve-worker] client: ${fs.existsSync(clientRoot) ? "ok" : "MISSING"}`);
+  // Warm bundle in background (non-blocking for Render port bind)
+  getHandler().catch(() => {});
 });

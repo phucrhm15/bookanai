@@ -58,7 +58,17 @@ Deploy lại commit mới nhất.
 
 SSR chạy nhưng `/assets/*.css` và `/assets/*.js` bị 404 → cần `serve-worker.mjs` phục vụ `dist/client` (đã sửa). Deploy commit mới.
 
-## 8. Sau khi Live
+## 8. Vào được rồi **502 Bad Gateway** (sập sau đó)
+
+Thường do **Render Free 512MB**:
+
+1. **OOM** — Dockerfile từng set `NODE_OPTIONS=1536` lúc chạy → process bị kill. Đã sửa: heap runtime **448MB**, load app **lazy**.
+2. **Web ngủ** — 15 phút không traffic → lần mở sau cold start ~1 phút, refresh lại nếu 502.
+3. Xem **Logs** → tìm `Killed`, `ENOMEM`, `heap out of memory`.
+
+Deploy commit mới → **Manual Deploy** → đợi Live → thử lại (refresh 2–3 lần nếu vừa wake).
+
+## 9. Sau khi Live
 
 - URL: `https://bookanai.onrender.com` (hoặc URL Render cấp)
 - Clerk: thêm domain + `/sign-in`, `/sign-up`, `/marketplace`

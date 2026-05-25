@@ -148,6 +148,14 @@ export const en = {
     confirmedIn: "Confirmed on Arc Ledger in {{seconds}}s",
     historySubtitle: "x402 Nanopayments · Arc Network",
     entries: "{{count}} entries",
+    timeJustNow: "just now",
+  },
+  ledger: {
+    depositSync: "USDC deposit · synced from on-chain wallet",
+    x402: "x402 · {{agent}}",
+    refundX402: "Refund · x402 {{agent}} failed",
+    refundPending: "Refund · pending payment {{id}}",
+    refundHold: "Refund · payment hold {{id}}",
   },
   auth: {
     signIn: "Sign in",

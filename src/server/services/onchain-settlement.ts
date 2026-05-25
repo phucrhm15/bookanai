@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { SupportedChainId } from "@/lib/chains";
 import { getDb } from "@/server/db/client";
 import { pendingOnchainSettlements } from "@/server/db/schema";
+import { ledgerLabelRefundHold, ledgerLabelRefundPending } from "@/server/ledger-label-keys";
 import { microToUsdc, usdcToMicro } from "@/server/db/usdc";
 import { executeUserToMasterTransfer } from "@/server/services/usdc-transfer";
 
@@ -127,7 +128,7 @@ export async function releaseStaleReservedSettlements(
     userStore.credit(
       row.userId,
       amount,
-      `Hoàn tiền · thanh toán treo (timeout) ${row.ledgerEntryId.slice(0, 12)}`,
+      ledgerLabelRefundPending(row.ledgerEntryId),
     );
     released++;
     refundedUsdc += amount;
@@ -171,7 +172,7 @@ export async function repairSettlementHolds(
   for (const row of active.filter((r) => r.status === "reserved")) {
     const amount = microToUsdc(row.amountMicroUsdc);
     cancelOnchainSettlementForLedgerEntry(row.ledgerEntryId);
-    userStore.credit(row.userId, amount, `Hoàn tiền · giữ chỗ thanh toán ${row.id.slice(0, 14)}`);
+    userStore.credit(row.userId, amount, ledgerLabelRefundHold(row.id));
     released++;
     refundedUsdc += amount;
     console.warn(`[settlement] Cleared reserved ${row.id} (+${amount} USDC refund)`);

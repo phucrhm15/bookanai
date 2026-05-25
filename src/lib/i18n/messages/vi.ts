@@ -152,6 +152,14 @@ export const vi: typeof en = {
     confirmedIn: "Xác nhận trên Arc Ledger sau {{seconds}}s",
     historySubtitle: "x402 Nanopayments · Arc Network",
     entries: "{{count}} mục",
+    timeJustNow: "vừa xong",
+  },
+  ledger: {
+    depositSync: "Nạp USDC · đồng bộ từ ví on-chain",
+    x402: "x402 · {{agent}}",
+    refundX402: "Hoàn tiền · x402 {{agent}} thất bại",
+    refundPending: "Hoàn tiền · thanh toán treo {{id}}",
+    refundHold: "Hoàn tiền · giữ chỗ thanh toán {{id}}",
   },
   auth: {
     signIn: "Đăng nhập",

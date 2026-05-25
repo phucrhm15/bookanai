@@ -28,9 +28,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/locale-context";
+import { formatLedgerLabel } from "@/lib/ledger-labels";
+import type { Locale } from "@/lib/i18n/types";
 
 export function WalletPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { data, isLoading, isError, error } = useWallet();
 
   const address = data?.address ?? "";
@@ -73,7 +75,7 @@ export function WalletPage() {
           baseNetwork={baseNetwork}
           arcNetwork={arcNetwork}
         />
-        <TransactionHistory t={t} transactions={data?.transactions ?? []} />
+        <TransactionHistory t={t} locale={locale} transactions={data?.transactions ?? []} />
       </div>
     </div>
   );
@@ -490,9 +492,11 @@ function FakeQR() {
 
 function TransactionHistory({
   t,
+  locale,
   transactions,
 }: {
   t: (key: string, params?: Record<string, string | number>) => string;
+  locale: Locale;
   transactions: {
     id: string;
     label: string;
@@ -535,9 +539,13 @@ function TransactionHistory({
                   {positive ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{tx.label}</div>
+                  <div className="truncate text-sm font-medium">
+                    {formatLedgerLabel(tx.label, tx.kind, locale)}
+                  </div>
                   <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                    <span>{tx.timestamp}</span>
+                    <span>
+                      {tx.timestamp === "just now" ? t("wallet.timeJustNow") : tx.timestamp}
+                    </span>
                     {tx.kind === "nanopayment" && (
                       <span className="rounded-sm border border-primary/30 bg-primary/5 px-1 py-px text-[9px] uppercase tracking-wider text-primary">
                         x402

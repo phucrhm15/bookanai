@@ -4,6 +4,7 @@ import type { Transaction } from "@/lib/mock-data";
 import { getDb, withImmediateTransaction } from "@/server/db/client";
 import { ledgerEntries, users } from "@/server/db/schema";
 import { microToUsdc, usdcToMicro } from "@/server/db/usdc";
+import { ledgerLabelDepositSync } from "@/server/ledger-label-keys";
 
 /** Clerk user id — stored in SQLite column `user_id` (equivalent to clerkId). */
 export type ClerkId = string;
@@ -204,7 +205,7 @@ export const userStore = {
       return user;
     }
     const delta = syncable - user.ledgerBalance;
-    return userStore.credit(clerkId, delta, "Nạp USDC · đồng bộ từ ví on-chain");
+    return userStore.credit(clerkId, delta, ledgerLabelDepositSync());
   },
 
   /**

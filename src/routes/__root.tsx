@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{
       { title: "Nano.Agent — x402 AI agents · USDC on Base" },
       {
         name: "description",
-        content: "Messari & Perplexity qua x402, định dạng thread X. Circle wallets + Clerk.",
+        content: "Messari & Perplexity via x402, X thread formatting. Circle wallets + Clerk.",
       },
       { property: "og:title", content: "Nano.Agent" },
       {

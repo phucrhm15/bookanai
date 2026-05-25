@@ -14,6 +14,7 @@
 import { isSupportedChainId, type SupportedChainId } from "@/lib/chains";
 import { probeX402ResourcePrice } from "@/lib/x402-probe";
 import { extractX402MarketplaceContent } from "@/lib/x402-content";
+import { ledgerLabelRefundX402, ledgerLabelX402 } from "@/server/ledger-label-keys";
 import {
   circleRuntimeReady,
   ensureClerkUserWalletSynced,
@@ -192,7 +193,7 @@ export async function processNanopaymentX402(
 
   try {
     const debitResult = userStore.debit(clerkId, agentPriceUsdc, {
-      label: `x402 · ${agentServiceId}`,
+      label: ledgerLabelX402(agentServiceId),
       agentId: agentServiceId,
       idempotencyKey,
     });
@@ -269,7 +270,7 @@ export async function processNanopaymentX402(
 
     if (debited && debitedAmount > 0) {
       try {
-        userStore.credit(clerkId, debitedAmount, `Hoàn tiền · x402 ${agentServiceId} thất bại`);
+        userStore.credit(clerkId, debitedAmount, ledgerLabelRefundX402(agentServiceId));
         console.warn(`[x402] SQLite refund ${debitedAmount} USDC for clerkId=${clerkId}`);
       } catch (rollbackError) {
         console.error("[x402] SQLite refund failed:", rollbackError);

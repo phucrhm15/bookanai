@@ -41,7 +41,20 @@ Gửi 10–20 dòng cuối nếu vẫn fail.
 
 Giữ nguyên Environment Variables. Save → Deploy.
 
-## 6. Sau khi Live
+## 6. Health check timeout (`bookanai.onrender.com:10000/api/health`)
+
+Build OK nhưng deploy fail → app chưa kịp lên (trước đây dùng `vite dev`, rất chậm trên Free).
+
+**Đã sửa:** Docker chạy `npm run build` + `node scripts/serve-worker.mjs` (khởi động nhanh).
+
+Trên Render → **Settings** → **Health Checks**:
+
+- **Health Check Path:** `/api/health`
+- **Health Check Grace Period:** `180` giây (nếu có ô này)
+
+Deploy lại commit mới nhất.
+
+## 7. Sau khi Live
 
 - URL: `https://bookanai.onrender.com` (hoặc URL Render cấp)
 - Clerk: thêm domain + `/sign-in`, `/sign-up`, `/marketplace`

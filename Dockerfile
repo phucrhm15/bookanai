@@ -1,4 +1,4 @@
-# Render / VPS — Node 22 + SQLite (TanStack Start requires >=22.12)
+# Render / VPS — Node 22, build once, serve via scripts/serve-worker.mjs (fast health check)
 FROM node:22-bookworm-slim
 
 RUN apt-get update \
@@ -9,12 +9,13 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-ENV NODE_OPTIONS=--max-old-space-size=1024
+ENV NODE_OPTIONS=--max-old-space-size=1536
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
 RUN npm rebuild better-sqlite3
+RUN npm run build
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
@@ -23,7 +24,7 @@ ENV DATABASE_URL=file:/data/bookanai.db
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD sh -c 'curl -fsS "http://127.0.0.1:${PORT:-3000}/api/health" || exit 1'
 
-CMD ["node", "scripts/start-prod.mjs"]
+CMD ["node", "scripts/serve-worker.mjs"]

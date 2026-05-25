@@ -12,10 +12,4 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
-  vite: {
-    ssr: {
-      // Native module — must not be bundled into the Cloudflare worker chunk on Node hosts (Render)
-      external: ["better-sqlite3"],
-    },
-  },
 });

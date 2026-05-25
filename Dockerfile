@@ -20,6 +20,7 @@ RUN NODE_OPTIONS=--max-old-space-size=1536 npm run build
 # 512MB Render Free — do not request 1.5GB heap at runtime
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--max-old-space-size=448
+ENV APP_ROOT=/app
 ENV HOST=0.0.0.0
 ENV PORT=3000
 ENV DATABASE_URL=file:/tmp/bookanai.db

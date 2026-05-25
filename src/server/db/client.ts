@@ -5,26 +5,52 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const Database = require("better-sqlite3") as typeof import("better-sqlite3").default;
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import * as schema from "@/server/db/schema";
 
 let sqlite: Database.Database | undefined;
 let orm: ReturnType<typeof drizzle<typeof schema>> | undefined;
 
+function appRoot(): string {
+  return process.env.APP_ROOT?.trim() || process.cwd();
+}
+
 export function resolveDatabasePath(): string {
   const raw = process.env.DATABASE_URL?.trim() || "file:./data/bookanai.db";
   if (raw.startsWith("file:")) {
-    return path.resolve(process.cwd(), raw.slice("file:".length));
+    const p = raw.slice("file:".length);
+    return path.isAbsolute(p) ? p : path.resolve(appRoot(), p);
   }
-  return path.resolve(process.cwd(), raw);
+  return path.resolve(appRoot(), raw);
 }
 
-function ensureMigrations(): void {
-  const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-  if (!fs.existsSync(migrationsFolder)) {
-    throw new Error(`Missing migrations folder: ${migrationsFolder}`);
+function tableExists(database: Database.Database, name: string): boolean {
+  const row = database
+    .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(name) as { ok: number } | undefined;
+  return Boolean(row);
+}
+
+function applyInitialSqlFile(database: Database.Database): void {
+  const sqlPath = path.join(appRoot(), "drizzle", "0000_initial.sql");
+  if (!fs.existsSync(sqlPath)) {
+    throw new Error(`Missing migration SQL: ${sqlPath}`);
   }
-  migrate(getDb(), { migrationsFolder });
+  const sql = fs.readFileSync(sqlPath, "utf8");
+  const statements = sql
+    .split(/-->\s*statement-breakpoint\s*/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const stmt of statements) {
+    database.exec(stmt);
+  }
+}
+
+/** Single migration file (`drizzle/0000_initial.sql`) — apply when DB is new (e.g. Render /tmp). */
+function ensureMigrations(): void {
+  const database = getSqlite();
+  if (!tableExists(database, "users")) {
+    applyInitialSqlFile(database);
+  }
 }
 
 export function getSqlite(): Database.Database {
@@ -40,9 +66,10 @@ export function getSqlite(): Database.Database {
 }
 
 export function getDb() {
+  const database = getSqlite();
   if (!orm) {
-    orm = drizzle(getSqlite(), { schema });
     ensureMigrations();
+    orm = drizzle(database, { schema });
   }
   return orm;
 }

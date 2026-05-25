@@ -2,7 +2,10 @@
  * Production HTTP for Render/VPS — listen immediately, lazy-load worker (saves RAM on 512MB).
  */
 import "./polyfill-cjs-globals.mjs";
+import { bootstrapDatabase } from "./bootstrap-db.mjs";
 import { createServer } from "node:http";
+
+bootstrapDatabase();
 import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";

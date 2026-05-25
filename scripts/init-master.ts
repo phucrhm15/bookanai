@@ -4,7 +4,11 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { getMasterAgentStatus, isMasterAgentConfigured } from "../src/services/masterAgent";
+import {
+  getMasterAgentStatus,
+  initializeMasterAgentWallet,
+  isMasterAgentConfigured,
+} from "../src/services/masterAgent";
 
 function loadEnvLocal() {
   const path = resolve(process.cwd(), ".env.local");
@@ -30,7 +34,17 @@ if (!isMasterAgentConfigured()) {
   process.exit(1);
 }
 
+try {
+  const cache = await initializeMasterAgentWallet();
+  console.log("Master wallet ready:");
+  console.log(JSON.stringify(cache, null, 2));
+} catch (error) {
+  console.error("Init failed:", error instanceof Error ? error.message : error);
+  process.exit(1);
+}
+
 const status = await getMasterAgentStatus();
+console.log("\nStatus:");
 console.log(JSON.stringify(status, null, 2));
 console.log("\nAdd to .env.local if empty:");
 console.log(`MASTER_WALLET_SET_ID=${status.walletSetId ?? ""}`);

@@ -1,84 +1,137 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/tanstack-react-start";
 import { useActiveAgent } from "@/lib/agent-store";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
-import { TweetPreview } from "@/components/TweetPreview";
-import { ARC_CHAIN_ID } from "@/lib/chains";
-import { DEMO_USER_ID, fetchWallet, postNanopayment } from "@/lib/wallet-api";
-import { toast } from "sonner";
+import { TweetThreadPreview } from "@/components/TweetThreadPreview";
+import { BASE_CHAIN_ID, BASE_NETWORK } from "@/lib/chains";
+import { postNanopayment } from "@/lib/wallet-api";
+import { agentPromptMismatch } from "@/lib/agent-prompt-hints";
+import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
+import { useTranslation } from "@/lib/i18n/locale-context";
+import { useWallet, walletQueryKey } from "@/hooks/use-wallet";
 
 type GenState = "idle" | "authorizing" | "generating" | "done";
 
-const SAMPLE_OUTPUTS: Record<string, string> = {
-  "alpha-caller-x":
-    "Something is happening with $RWA narratives. Wallets that called $ONDO at $0.20 are rotating into 3 micro-caps this week. Not advice, just signal. 🧵",
-  "meme-image-gen":
-    "when the agent pays itself in USDC to shitpost about your bag 📈🤖",
-  "rwa-thread-writer":
-    "Tokenized treasuries crossed $2.1B AUM this quarter. Here's why the next leg is private credit — and the 3 protocols positioned to capture it. 🧵",
-  "crypto-writer":
-    "Daily recap → BTC chops at 67k, ETH/BTC bounces from 4y lows, Base TVL prints ATH. Solana memes cool off as attention rotates back to L2s.",
-  "shitpost-9000":
-    "respectfully, your portfolio is not bearish — it is just bad. gm.",
-};
-
 export function Studio() {
   const { activeAgent } = useActiveAgent();
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
-  const { data: wallet } = useQuery({
-    queryKey: ["wallet", DEMO_USER_ID],
-    queryFn: () => fetchWallet(DEMO_USER_ID),
-    staleTime: 30_000,
-  });
+  const { data: wallet } = useWallet();
+  const { t, locale } = useTranslation();
 
-  const [prompt, setPrompt] = useState(
-    "Write a punchy X post about why nanopayments will unlock autonomous AI agents.",
-  );
+  const defaultPrompt =
+    activeAgent.id === "messari-analyst"
+      ? t("studio.defaultPromptMessari")
+      : t("studio.defaultPromptPerplexity");
+
+  const [prompt, setPrompt] = useState(defaultPrompt);
   const [state, setState] = useState<GenState>("idle");
-  const [output, setOutput] = useState<string | null>(null);
+  const [rawResponse, setRawResponse] = useState<string | null>(null);
+  const payInFlight = useRef(false);
+
+  useEffect(() => {
+    setPrompt(
+      activeAgent.id === "messari-analyst"
+        ? t("studio.defaultPromptMessari")
+        : t("studio.defaultPromptPerplexity"),
+    );
+  }, [activeAgent.id, t]);
+
+  const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
 
   const run = async () => {
     if (!prompt.trim()) {
-      toast.error("Add a prompt first");
+      toast.error(t("studio.promptEmpty"));
       return;
     }
-    setOutput(null);
+    const mismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
+    if (mismatch.warn && mismatch.message) {
+      toast.warning(t("studio.promptMismatchTitle"), { description: mismatch.message });
+    }
+    if (payInFlight.current) {
+      return;
+    }
+    payInFlight.current = true;
+    setRawResponse(null);
     setState("authorizing");
 
+    const idempotencyKey =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `pay-${Date.now()}`;
+
+    let payment: Awaited<ReturnType<typeof postNanopayment>> | undefined;
     try {
-      if (wallet?.walletId) {
-        await postNanopayment(wallet.walletId, activeAgent.id, ARC_CHAIN_ID);
-        await queryClient.invalidateQueries({ queryKey: ["wallet", DEMO_USER_ID] });
+      if (!wallet?.walletId) {
+        throw new Error(t("studio.walletNotLoaded"));
       }
+      const chainId = wallet.preferredChainId ?? wallet.networks?.base?.id ?? BASE_CHAIN_ID;
+      setState("generating");
+      payment = await postNanopayment(
+        wallet.walletId,
+        activeAgent.id,
+        chainId,
+        prompt.trim(),
+        idempotencyKey,
+      );
+      await queryClient.invalidateQueries({ queryKey: walletQueryKey(userId) });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "x402 payment failed";
-      toast.error(msg);
+      const raw =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : t("studio.paymentFailedGeneric");
+      const msg = formatNanopaymentError(raw, activeAgent.id, locale);
+      toast.error(t("studio.paymentFailed"), { description: msg });
+      setState("idle");
+      return;
+    } finally {
+      payInFlight.current = false;
+    }
+
+    const body = payment?.rawResponse?.trim() || payment?.generatedContent?.trim();
+    if (!body) {
+      toast.error(t("studio.paymentNoData"));
       setState("idle");
       return;
     }
 
-    setState("generating");
-    await new Promise((r) => setTimeout(r, 1800));
-    setOutput(SAMPLE_OUTPUTS[activeAgent.id] ?? "Generated content goes here.");
+    setRawResponse(body);
     setState("done");
-    toast.success(`Charged ${activeAgent.price} USDC`, {
-      description: `Paid to ${activeAgent.name} via x402 nanopayment on Arc`,
+    const settlement = payment?.onChainSettlementTxId
+      ? t("studio.settlementTx", { id: payment.onChainSettlementTxId.slice(0, 10) })
+      : t("studio.settlementQueued");
+    toast.success(t("studio.charged", { amount: payment?.chargedUsdc ?? activeAgent.price }), {
+      description: payment
+        ? t("studio.chargedDescLedger", {
+            balance: payment.ledgerBalance.toFixed(2),
+            settlement,
+          })
+        : `Paid via x402 on ${BASE_NETWORK.name}`,
     });
   };
 
   const loading = state === "authorizing" || state === "generating";
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
       <header className="mb-8">
-        <Badge variant="outline" className="border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
-          Studio
+        <Badge
+          variant="outline"
+          className="border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary"
+        >
+          {t("studio.badge")}
         </Badge>
         <h1 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Generate <span className="text-gradient-neon">on-chain</span> content
+          {t("studio.title")} <span className="text-gradient-neon">{t("studio.titleAccent")}</span>
         </h1>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          {t("studio.subtitle", { baseUrl: activeAgent.baseUrl })}
+        </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -92,27 +145,36 @@ export function Studio() {
                 <div>
                   <div className="text-sm font-semibold">{activeAgent.name}</div>
                   <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {activeAgent.handle}
+                    {activeAgent.handle} · {activeAgent.baseUrl.replace("https://", "")}
                   </div>
                 </div>
               </div>
-              <Badge variant="outline" className="border-primary/30 bg-primary/10 font-mono text-xs text-primary">
-                {activeAgent.price} USDC / prompt
+              <Badge
+                variant="outline"
+                className="border-primary/30 bg-primary/10 font-mono text-xs text-primary"
+              >
+                {t("studio.x402Dynamic")}
               </Badge>
             </div>
 
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="What should the agent post about?"
+              placeholder={defaultPrompt}
               rows={7}
               className="resize-none border-border/60 bg-background/60 font-mono text-sm"
               disabled={loading}
             />
+            {promptMismatch.warn && promptMismatch.message ? (
+              <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                {promptMismatch.message}
+              </p>
+            ) : null}
 
             <div className="mt-4 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span className="text-success">●</span> x402 Nanopayments · Arc Network
+                <span className="text-success">●</span>{" "}
+                {t("studio.footerLine", { network: BASE_NETWORK.name })}
               </p>
               <Button
                 size="lg"
@@ -123,19 +185,19 @@ export function Studio() {
                 {state === "authorizing" && (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Authorizing x402 Nanopayment…
+                    {t("studio.runAuthorizing")}
                   </>
                 )}
                 {state === "generating" && (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Agent Processing…
+                    {t("studio.runFetching")}
                   </>
                 )}
                 {!loading && (
                   <>
                     <Wand2 className="h-4 w-4" />
-                    Generate Tweet · {activeAgent.price} USDC
+                    {t("studio.runIdle")}
                   </>
                 )}
               </Button>
@@ -143,9 +205,17 @@ export function Studio() {
           </div>
 
           <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-[10px] uppercase tracking-wider">
-            <StatusPill label="x402 Authorize" active={state === "authorizing"} done={state === "generating" || state === "done"} />
-            <StatusPill label="Agent Process" active={state === "generating"} done={state === "done"} />
-            <StatusPill label="Deliver" active={false} done={state === "done"} />
+            <StatusPill
+              label={t("studio.statusAuthorize")}
+              active={state === "authorizing"}
+              done={state === "generating" || state === "done"}
+            />
+            <StatusPill
+              label={t("studio.statusFetch")}
+              active={state === "generating"}
+              done={state === "done"}
+            />
+            <StatusPill label={t("studio.statusFormat")} active={false} done={state === "done"} />
           </div>
         </section>
 
@@ -153,20 +223,35 @@ export function Studio() {
           <div className="mb-2 flex items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              X Preview
+              {t("thread.previewTitle")}
             </span>
           </div>
-          <TweetPreview
+          <TweetThreadPreview
+            agentId={activeAgent.id}
             authorName={activeAgent.name}
             authorHandle={activeAgent.handle}
             avatarEmoji={activeAgent.emoji}
-            content={output}
+            rawResponse={rawResponse}
             loading={loading}
           />
         </section>
       </div>
     </div>
   );
+}
+
+function formatNanopaymentError(
+  message: string,
+  agentId: string,
+  locale: import("@/lib/i18n/types").Locale,
+): string {
+  if (message.includes("Payment settlement failed") && agentId === "perplexity-social") {
+    return formatPaymentErrorForUser(
+      `${message} · Admin: npm run gateway:status (Gateway ≥ 0.012 USDC)`,
+      locale,
+    );
+  }
+  return formatPaymentErrorForUser(message, locale);
 }
 
 function StatusPill({ label, active, done }: { label: string; active: boolean; done: boolean }) {

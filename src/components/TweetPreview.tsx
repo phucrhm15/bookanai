@@ -17,7 +17,6 @@ export type TweetPreviewProps = {
   avatarEmoji?: string;
   avatarUrl?: string;
   content?: string | null;
-  imageUrl?: string;
   loading?: boolean;
 };
 
@@ -27,7 +26,6 @@ export function TweetPreview({
   avatarEmoji = "◈",
   avatarUrl,
   content,
-  imageUrl,
   loading = false,
 }: TweetPreviewProps) {
   return (
@@ -56,24 +54,6 @@ export function TweetPreview({
               </span>
             )}
           </div>
-
-          {!loading && content && imageUrl && (
-            <div className="mt-3 overflow-hidden rounded-xl border border-border/60">
-              <img
-                src={imageUrl}
-                alt=""
-                className="h-44 w-full object-cover"
-              />
-            </div>
-          )}
-
-          {!loading && content && !imageUrl && avatarEmoji === "✦" && (
-            <div className="mt-3 overflow-hidden rounded-xl border border-border/60">
-              <div className="grid-bg flex h-44 items-center justify-center bg-gradient-panel">
-                <span className="font-display text-5xl">🐸💎</span>
-              </div>
-            </div>
-          )}
 
           <div className="mt-4 flex max-w-md items-center justify-between text-muted-foreground">
             <XAction icon={<MessageCircle className="h-4 w-4" />} label="42" />

@@ -15,11 +15,11 @@ const envSchema = z.object({
     .string()
     .regex(/^0x[0-9a-fA-F]{40}$/)
     .default("0x3600000000000000000000000000000000000000"),
-  DEMO_USER_ID: z.string().default("demo-user"),
   X402_DISCOVERY_URL: z
     .string()
     .url()
     .default("https://api.circle.com/v2/x402/discovery/resources"),
+  SETTLEMENT_CRON_SECRET: z.string().min(16).optional(),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

@@ -12,21 +12,25 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-
-const items = [
-  { title: "Marketplace", url: "/", icon: Store },
-  { title: "My Studio", url: "/studio", icon: Sparkles },
-  { title: "Wallet & Billing", url: "/wallet", icon: Wallet },
-];
+import { AuthControls, AuthSidebarHint } from "@/components/auth-controls";
+import { useTranslation } from "@/lib/i18n/locale-context";
+import { WalletBalanceDisplay } from "@/components/wallet-balance-display";
 
 export function AppSidebar() {
+  const { t } = useTranslation();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
+
+  const items = [
+    { title: t("nav.marketplace"), url: "/marketplace", icon: Store },
+    { title: t("nav.studio"), url: "/studio", icon: Sparkles },
+    { title: t("nav.wallet"), url: "/wallet", icon: Wallet },
+  ];
+  const isActive = (url: string) => pathname === url || pathname.startsWith(`${url}/`);
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/" className="flex items-center gap-2 px-2 py-3">
+        <Link to="/marketplace" className="flex items-center gap-2 px-2 py-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-neon text-neon-foreground font-bold text-lg shadow-neon">
             N
           </div>
@@ -35,7 +39,7 @@ export function AppSidebar() {
               NANO<span className="text-gradient-neon">.AGENT</span>
             </div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Web3 Studio
+              {t("nav.web3Studio")}
             </div>
           </div>
         </Link>
@@ -66,8 +70,11 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
+        <WalletBalanceDisplay variant="sidebar" />
+        <AuthSidebarHint />
+        <AuthControls variant="sidebar" />
         <div className="px-2 py-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground group-data-[collapsible=icon]:hidden">
-          <span className="text-success">●</span> Circle Mainnet
+          <span className="text-success">●</span> {t("nav.circleMainnet")}
         </div>
       </SidebarFooter>
     </Sidebar>

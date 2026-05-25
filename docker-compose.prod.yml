@@ -1,0 +1,44 @@
+# Production stack: app + Caddy (automatic HTTPS). Requires DNS A record → this server.
+# Usage:
+#   export DOMAIN=app.example.com
+#   docker compose -f docker-compose.prod.yml up -d --build
+services:
+  bookanai:
+    build: .
+    expose:
+      - "3000"
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: file:/data/bookanai.db
+      NODE_ENV: production
+    volumes:
+      - bookanai-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN=your.hostname.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      bookanai:
+        condition: service_healthy
+
+volumes:
+  bookanai-data:
+  caddy_data:
+  caddy_config:

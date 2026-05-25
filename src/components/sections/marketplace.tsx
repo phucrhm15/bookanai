@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { AGENTS, AGENT_SERVICES_COUNT, type Agent } from "@/lib/mock-data";
+import { AGENT_SERVICES_COUNT, type Agent } from "@/lib/mock-data";
+import { getLocalizedAgents } from "@/lib/agents-localized";
 import { useActiveAgent } from "@/lib/agent-store";
+import { useTranslation } from "@/lib/i18n/locale-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -20,24 +22,27 @@ const accentMap: Record<Agent["accent"], string> = {
 export function Marketplace() {
   const { activeAgent, setActiveAgent } = useActiveAgent();
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   const [query, setQuery] = useState("");
+
+  const agents = useMemo(() => getLocalizedAgents(locale), [locale]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return AGENTS;
-    return AGENTS.filter(
+    if (!q) return agents;
+    return agents.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
         a.handle.toLowerCase().includes(q) ||
         a.category.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q),
     );
-  }, [query]);
+  }, [query, agents]);
 
   const onSelect = (agent: Agent) => {
     setActiveAgent(agent);
-    toast.success(`${agent.name} is now active`, {
-      description: `${agent.price} USDC per request`,
+    toast.success(t("marketplace.toastActive", { name: agent.name }), {
+      description: t("marketplace.toastActiveDesc", { price: agent.price }),
     });
   };
 
@@ -45,20 +50,26 @@ export function Marketplace() {
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
       <header className="mb-6 flex flex-col gap-3 md:mb-8">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
-            Marketplace
+          <Badge
+            variant="outline"
+            className="border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary"
+          >
+            {t("marketplace.badge")}
           </Badge>
-          <Badge variant="outline" className="gap-1 border-border/60 bg-card/60 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Badge
+            variant="outline"
+            className="gap-1 border-border/60 bg-card/60 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+          >
             <Zap className="h-3 w-3 text-primary" />
-            Powered by <span className="text-foreground">agents.circle.com/services</span>
+            {t("marketplace.poweredBy")}{" "}
+            <span className="text-foreground">agents.circle.com/services</span>
           </Badge>
         </div>
         <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Hire an <span className="text-gradient-neon">AI Agent</span>
+          {t("marketplace.title")}{" "}
+          <span className="text-gradient-neon">{t("marketplace.titleAccent")}</span>
         </h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Autonomous agents that post on X and pay per inference using x402 nanopayments. Select one to start generating in your Studio.
-        </p>
+        <p className="max-w-2xl text-sm text-muted-foreground">{t("marketplace.subtitle")}</p>
       </header>
 
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -67,16 +78,16 @@ export function Marketplace() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${AGENT_SERVICES_COUNT}+ Agent Services…`}
+            placeholder={t("marketplace.searchPlaceholder")}
             className="border-border/60 bg-card/60 pl-9 font-mono text-sm placeholder:text-muted-foreground/70"
           />
         </div>
         <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {filtered.length} of {AGENT_SERVICES_COUNT}+ endpoints
+          {t("marketplace.agentsCount", { count: filtered.length, total: AGENT_SERVICES_COUNT })}
         </div>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2">
         {filtered.map((agent) => {
           const active = activeAgent.id === agent.id;
           return (
@@ -108,12 +119,15 @@ export function Marketplace() {
                 <p className="font-mono text-xs text-muted-foreground">{agent.handle}</p>
               </div>
               <p className="relative mt-3 text-sm text-muted-foreground">{agent.description}</p>
+              <p className="relative mt-2 font-mono text-[10px] text-muted-foreground/80">
+                {agent.baseUrl}
+              </p>
 
               <div className="relative mt-5 flex items-center justify-between gap-2">
                 <div className="flex items-baseline gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1">
                   <span className="font-mono text-sm font-bold text-primary">{agent.price}</span>
                   <span className="font-mono text-[10px] uppercase tracking-wider text-primary/70">
-                    USDC / request
+                    {t("marketplace.usdcPerRequest")}
                   </span>
                 </div>
                 <Button
@@ -126,11 +140,11 @@ export function Marketplace() {
                 >
                   {active ? (
                     <>
-                      <Check className="h-3.5 w-3.5" /> Active
+                      <Check className="h-3.5 w-3.5" /> {t("marketplace.active")}
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-3.5 w-3.5" /> Select
+                      <Sparkles className="h-3.5 w-3.5" /> {t("marketplace.select")}
                     </>
                   )}
                 </Button>
@@ -143,7 +157,7 @@ export function Marketplace() {
                   className="relative mt-2 h-auto p-0 text-xs text-primary"
                   onClick={() => navigate({ to: "/studio" })}
                 >
-                  Open Studio →
+                  {t("marketplace.openStudio")}
                 </Button>
               )}
             </article>
@@ -152,7 +166,7 @@ export function Marketplace() {
 
         {filtered.length === 0 && (
           <div className="col-span-full rounded-xl border border-dashed border-border/60 bg-card/40 p-10 text-center text-sm text-muted-foreground">
-            No agents match "{query}". Try another keyword.
+            {t("marketplace.noResults", { query })}
           </div>
         )}
       </div>

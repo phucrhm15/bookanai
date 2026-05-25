@@ -1,18 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ARC_NETWORK, BASE_NETWORK, USDC_CONTRACT_ADDRESS } from "@/lib/mock-data";
+import { defaultPaymentChainId } from "@/lib/circle-dcw-blockchains";
+import { ARC_NETWORK, BASE_NETWORK } from "@/lib/mock-data";
 import {
   ARC_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
   circleRuntimeReady,
-  getOrCreateUserWallet,
+  ensureClerkUserWalletSynced,
 } from "@/services/circleService";
 import { getServerEnv } from "@/server/config/env";
+import {
+  requireClerkUserId,
+  unauthorizedJsonResponse,
+  UnauthorizedError,
+} from "@/server/auth/clerk-session";
+import {
+  getOnchainSettlementHoldUsdc,
+  repairSettlementHolds,
+} from "@/server/services/onchain-settlement";
 import { userStore } from "@/server/storage/user-store";
 
 export const Route = createFileRoute("/api/wallet/")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: async () => {
         try {
           if (!circleRuntimeReady()) {
             return Response.json(
@@ -21,23 +31,30 @@ export const Route = createFileRoute("/api/wallet/")({
             );
           }
 
-          const body = (await request.json().catch(() => ({}))) as { userId?: string };
-          const env = getServerEnv();
-          const userId = body.userId ?? env.DEMO_USER_ID;
-
-          const wallet = await getOrCreateUserWallet(userId);
+          const clerkId = await requireClerkUserId();
+          const wallet = await ensureClerkUserWalletSynced(clerkId);
+          await repairSettlementHolds(clerkId, wallet.unifiedBalance.totalUsdc);
+          const hold = getOnchainSettlementHoldUsdc(clerkId);
+          const user = userStore.reconcileDepositsFromOnChain(
+            clerkId,
+            wallet.unifiedBalance.totalUsdc,
+            hold,
+          );
 
           return Response.json(
             {
-              userId: wallet.userId,
+              userId: clerkId,
               walletId: wallet.circleWalletId,
               address: wallet.address,
-              ledgerBalance: wallet.ledgerBalance,
+              ledgerBalance: user.ledgerBalance,
               unifiedBalance: wallet.unifiedBalance,
             },
             { status: 201 },
           );
         } catch (error) {
+          if (error instanceof UnauthorizedError) {
+            return unauthorizedJsonResponse();
+          }
           console.error("[POST /api/wallet]", error);
           return Response.json(
             { error: error instanceof Error ? error.message : "Wallet provisioning error" },
@@ -46,7 +63,7 @@ export const Route = createFileRoute("/api/wallet/")({
         }
       },
 
-      GET: async ({ request }) => {
+      GET: async () => {
         try {
           if (!circleRuntimeReady()) {
             return Response.json(
@@ -55,20 +72,30 @@ export const Route = createFileRoute("/api/wallet/")({
             );
           }
 
-          const url = new URL(request.url);
+          const clerkId = await requireClerkUserId();
           const env = getServerEnv();
-          const userId = url.searchParams.get("userId") ?? env.DEMO_USER_ID;
 
-          const wallet = await getOrCreateUserWallet(userId);
-          const user = userStore.getByUserId(userId);
+          const wallet = await ensureClerkUserWalletSynced(clerkId);
+          await repairSettlementHolds(clerkId, wallet.unifiedBalance.totalUsdc);
+          const hold = getOnchainSettlementHoldUsdc(clerkId);
+          const user = userStore.reconcileDepositsFromOnChain(
+            clerkId,
+            wallet.unifiedBalance.totalUsdc,
+            hold,
+          );
+
+          const preferredChainId = defaultPaymentChainId(env.CIRCLE_API_KEY);
+          const preferredNetwork =
+            preferredChainId === BASE_NETWORK.id ? BASE_NETWORK : ARC_NETWORK;
 
           return Response.json({
-            userId: wallet.userId,
+            userId: clerkId,
             walletId: wallet.circleWalletId,
             address: wallet.address,
-            ledgerBalance: wallet.ledgerBalance,
+            ledgerBalance: user.ledgerBalance,
             unifiedBalance: wallet.unifiedBalance,
-            usdcContractAddress: USDC_CONTRACT_ADDRESS,
+            preferredChainId,
+            usdcContractAddress: preferredNetwork.usdcContractAddress,
             networks: {
               base: {
                 ...BASE_NETWORK,
@@ -79,10 +106,13 @@ export const Route = createFileRoute("/api/wallet/")({
                 usdcContractAddress: ARC_USDC_CONTRACT_ADDRESS,
               },
             },
-            network: ARC_NETWORK,
-            transactions: user?.transactions ?? [],
+            network: preferredNetwork,
+            transactions: user.transactions,
           });
         } catch (error) {
+          if (error instanceof UnauthorizedError) {
+            return unauthorizedJsonResponse();
+          }
           console.error("[GET /api/wallet]", error);
           return Response.json(
             { error: error instanceof Error ? error.message : "Wallet error" },

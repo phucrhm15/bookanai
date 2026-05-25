@@ -6,6 +6,8 @@ import {
   DCW_BLOCKCHAIN_ARC,
   DCW_BLOCKCHAIN_BASE,
 } from "@/lib/chains";
+import { dcwBlockchainsForApiKey, isLiveCircleApiKey } from "@/lib/circle-dcw-blockchains";
+import { ARC_USDC_CONTRACT_ADDRESS, BASE_USDC_CONTRACT_ADDRESS } from "@/lib/chains";
 
 type MasterDcwClient = ReturnType<typeof initiateDeveloperControlledWalletsClient>;
 
@@ -15,11 +17,15 @@ export const MASTER_ARC_CHAIN_ID = ARC_CHAIN_ID;
 export const MASTER_ARC_BLOCKCHAIN = DCW_BLOCKCHAIN_ARC;
 export const MASTER_BASE_BLOCKCHAIN = DCW_BLOCKCHAIN_BASE;
 
-const MASTER_WALLET_BLOCKCHAINS = [DCW_BLOCKCHAIN_BASE, DCW_BLOCKCHAIN_ARC] as const;
-
-/** Native USDC on Arc Testnet */
+/** Arc Testnet USDC — used when API key is TEST */
 export const MASTER_USDC_CONTRACT_ADDRESS =
   "0x3600000000000000000000000000000000000000" as const;
+
+function masterUsdcTokenAddresses(apiKey: string): string[] {
+  return isLiveCircleApiKey(apiKey)
+    ? [BASE_USDC_CONTRACT_ADDRESS]
+    : [MASTER_USDC_CONTRACT_ADDRESS];
+}
 
 const MASTER_WALLET_SET_NAME = "bookanai-master-agent";
 const MASTER_WALLET_METADATA_NAME = "bookanai-master-system-agent";
@@ -124,10 +130,11 @@ async function createMasterWalletSet(
 async function createMasterEoaWallet(
   client: MasterDcwClient,
   walletSetId: string,
+  blockchains: ReturnType<typeof dcwBlockchainsForApiKey>,
 ): Promise<MasterAgentCache> {
   const response = await client.createWallets({
     accountType: "EOA",
-    blockchains: [...MASTER_WALLET_BLOCKCHAINS],
+    blockchains,
     count: 1,
     walletSetId,
     idempotencyKey: randomUUID(),
@@ -171,9 +178,11 @@ async function resolveMasterWalletFromEnv(
     };
   }
 
+  const apiKey = readEnv("CIRCLE_API_KEY") ?? "";
+  const blockchains = dcwBlockchainsForApiKey(apiKey);
   const walletSetId =
     presetWalletSetId ?? (await createMasterWalletSet(client));
-  return createMasterEoaWallet(client, walletSetId);
+  return createMasterEoaWallet(client, walletSetId, blockchains);
 }
 
 /**
@@ -214,21 +223,26 @@ async function getCachedOrInitMaster(): Promise<MasterAgentCache> {
 export async function fetchMasterUsdcBalance(): Promise<string> {
   const { walletId } = await getCachedOrInitMaster();
   const client = getMasterDcwClient();
+  const apiKey = readEnv("CIRCLE_API_KEY") ?? "";
+  const tokenAddresses = masterUsdcTokenAddresses(apiKey);
 
   try {
     const balanceResponse = await client.getWalletTokenBalance({
       id: walletId,
-      tokenAddresses: [MASTER_USDC_CONTRACT_ADDRESS],
+      tokenAddresses,
     });
 
     const tokenBalances = balanceResponse.data?.tokenBalances ?? [];
-    const usdc = tokenBalances.find(
-      (t) =>
-        t.token?.address?.toLowerCase() ===
-        MASTER_USDC_CONTRACT_ADDRESS.toLowerCase(),
-    );
+    let total = 0;
+    for (const row of tokenBalances) {
+      const addr = row.token?.tokenAddress?.toLowerCase();
+      const match = tokenAddresses.some((a) => a.toLowerCase() === addr);
+      if (match && row.amount) {
+        total += Number.parseFloat(row.amount) || 0;
+      }
+    }
 
-    return usdc?.amount ?? "0";
+    return total > 0 ? String(total) : "0";
   } catch (error) {
     if (error instanceof MasterAgentError) {
       throw error;
@@ -257,7 +271,7 @@ export async function getMasterAgentStatus(): Promise<MasterAgentStatus> {
     walletSetId: readEnv("MASTER_WALLET_SET_ID") ?? masterCache?.walletSetId ?? null,
     walletId: readEnv("MASTER_CIRCLE_WALLET_ID") ?? masterCache?.walletId ?? null,
     address: masterCache?.address ?? null,
-    blockchains: [...MASTER_WALLET_BLOCKCHAINS],
+    blockchains: dcwBlockchainsForApiKey(readEnv("CIRCLE_API_KEY") ?? ""),
     chainIds: [MASTER_BASE_CHAIN_ID, MASTER_ARC_CHAIN_ID],
     usdcContractAddress: MASTER_USDC_CONTRACT_ADDRESS,
     usdcBalance: null,

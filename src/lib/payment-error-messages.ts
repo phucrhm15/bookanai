@@ -1,0 +1,110 @@
+import type { Locale } from "@/lib/i18n/types";
+import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+
+const MASTER_USDC_RE =
+  /Ví Master thiếu USDC|Circle Gateway thiếu USDC|Gateway thiếu USDC|Master wallet|Circle Gateway/i;
+const USER_USDC_RE =
+  /Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient USDC|khả dụng|Insufficient balance|Content Credits/i;
+const GAS_RE =
+  /native token|insufficient funds for gas|max fee per gas|gas required exceeds|ETH gas/i;
+
+function spendableLooksZero(message: string): boolean {
+  const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
+  return m ? Number(m[1]) < 0.000_001 : false;
+}
+
+function extractAddress(message: string): string | undefined {
+  const match = message.match(/0x[a-fA-F0-9]{40}/);
+  return match?.[0];
+}
+
+/**
+ * Rewrite server/CLI errors for end users (locale-aware).
+ */
+export function formatPaymentErrorForUser(
+  rawMessage: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const message = rawMessage.trim();
+  if (!message) {
+    return locale === "vi"
+      ? "Thanh toán thất bại. Thử lại sau."
+      : "Payment failed. Please try again.";
+  }
+
+  if (MASTER_USDC_RE.test(message)) {
+    const addr = extractAddress(message);
+    if (locale === "vi") {
+      return (
+        "Hệ thống chưa đủ USDC để trả API cho agent (ví x402 của server, không phải ví Content Credits của bạn). " +
+        (addr
+          ? `Admin nạp thêm USDC (Base) vào ${addr} hoặc chạy: npm run gateway:deposit -- 0.15`
+          : "Admin chạy: npm run show:x402 rồi npm run gateway:deposit -- 0.15")
+      );
+    }
+    return (
+      "The server does not have enough USDC to pay the agent API (x402 master wallet, not your Content Credits). " +
+      (addr
+        ? `Admin: deposit USDC on Base to ${addr} or run: npm run gateway:deposit -- 0.15`
+        : "Admin: npm run show:x402 then npm run gateway:deposit -- 0.15")
+    );
+  }
+
+  if (GAS_RE.test(message)) {
+    const addr = extractAddress(message);
+    if (locale === "vi") {
+      return (
+        "Thiếu ETH gas trên Base cho ví x402 của server (MASTER_AGENT_PRIVATE_KEY), " +
+        "không phải ví bạn dùng để nạp Content Credits. " +
+        (addr
+          ? `Admin nạp ~0.001–0.002 ETH (Base) vào ${addr} · npm run show:x402`
+          : "Admin: npm run show:x402 — nạp ETH Base vào địa chỉ in ra.")
+      );
+    }
+    return (
+      "Insufficient ETH gas on Base for the server x402 wallet (MASTER_AGENT_PRIVATE_KEY), " +
+      "not your Content Credits wallet. " +
+      (addr
+        ? `Admin: send ~0.001–0.002 ETH (Base) to ${addr} · npm run show:x402`
+        : "Admin: npm run show:x402 — fund ETH on the printed address.")
+    );
+  }
+
+  if (USER_USDC_RE.test(message) && !MASTER_USDC_RE.test(message)) {
+    const holdMatch = message.match(/đang giữ chuyển ([\d.]+)|hold ([\d.]+)/i);
+    const ledgerMatch = message.match(/ledger ([\d.]+)/i);
+    const onChainMatch = message.match(/ví on-chain ([\d.]+)|on-chain ([\d.]+)/i);
+    const hold = holdMatch ? Number(holdMatch[1]) : 0;
+    const ledger = ledgerMatch ? Number(ledgerMatch[1]) : 0;
+    const onChain = onChainMatch ? Number(onChainMatch[1] ?? onChainMatch[2]) : 0;
+
+    if (locale === "vi") {
+      let hint =
+        "Mở Wallet & Billing → Top Up (USDC trên Base). Không cần ETH cho ví của bạn.";
+      if (onChain > 0 && ledger < 0.01 && hold < 0.000_001) {
+        hint = "Ví on-chain có USDC nhưng Content Credits chưa đồng bộ — refresh trang Wallet rồi thử lại.";
+      } else if (hold > 0.001 && spendableLooksZero(message)) {
+        hint =
+          "Một phần số dư đang chờ chuyển on-chain (hoặc treo sau lỗi). Đợi 1–2 phút, refresh Wallet, thử lại.";
+      }
+      return `Số dư Content Credits không đủ cho lần gọi này. ${hint} (${message})`;
+    }
+
+    let hint = "Open Wallet & Billing → Top Up (USDC on Base). You do not need ETH in your wallet.";
+    if (onChain > 0 && ledger < 0.01 && hold < 0.000_001) {
+      hint = "On-chain USDC exists but Content Credits are out of sync — refresh Wallet and retry.";
+    } else if (hold > 0.001 && spendableLooksZero(message)) {
+      hint =
+        "Part of your balance is pending on-chain transfer (or stuck after an error). Wait 1–2 minutes, refresh Wallet, retry.";
+    }
+    return `Insufficient Content Credits for this call. ${hint} (${message})`;
+  }
+
+  if (message.includes("Gateway batching") || message.includes("No Gateway batching")) {
+    return locale === "vi"
+      ? "Đang kết nối lại với x402. Thử Run Agent lần nữa."
+      : "Reconnecting to x402. Try Run Agent again.";
+  }
+
+  return message;
+}

@@ -1,0 +1,22 @@
+services:
+  bookanai:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: file:/data/bookanai.db
+      NODE_ENV: production
+    volumes:
+      - bookanai-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+volumes:
+  bookanai-data:

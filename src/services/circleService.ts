@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
-import { AGENTS } from "@/lib/mock-data";
 import {
   ARC_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
@@ -10,25 +9,23 @@ import {
   DCW_BLOCKCHAIN_BASE,
   UB_CHAIN_ARC,
   UB_CHAIN_BASE,
-  gatewayChainKeyForChainId,
   isSupportedChainId,
   type SupportedChainId,
 } from "@/lib/chains";
+import { MARKETPLACE_SETTLE_TIMEOUT_MS } from "@/server/config/api-timeouts";
+import { dcwBlockchainsForApiKey } from "@/lib/circle-dcw-blockchains";
 import { getServerEnv, isCircleConfigured } from "@/server/config/env";
 import { userStore } from "@/server/storage/user-store";
-import { resolveAgentServiceUrl } from "@/services/agent-service-map";
+import { payX402Resource, type X402PayRequestInit } from "@/server/services/x402-master-pay";
 import type { ChainBalanceBreakdown, UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
 export type { ChainBalanceBreakdown, UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
-const USER_WALLET_BLOCKCHAINS = [DCW_BLOCKCHAIN_BASE, DCW_BLOCKCHAIN_ARC] as const;
-
-const PAYMENT_FETCH_TIMEOUT_MS = 30_000;
 const PAYMENT_MAX_RETRIES = 2;
 
-let dcwClient: ReturnType<typeof initiateDeveloperControlledWalletsClient> | undefined;
-const gatewayClients = new Map<SupportedChainId, unknown>();
+export { executeUserToMasterTransfer } from "@/server/services/usdc-transfer";
 
+let dcwClient: ReturnType<typeof initiateDeveloperControlledWalletsClient> | undefined;
 function getDcwClient() {
   if (!dcwClient) {
     const env = getServerEnv();
@@ -40,12 +37,30 @@ function getDcwClient() {
   return dcwClient;
 }
 
-function ledgerFallback(userId: string): UnifiedBalanceSnapshot {
-  const user = userStore.getByUserId(userId);
-  const amount = user?.ledgerBalance ?? 0;
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  onTimeout: () => CircleServiceError,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(onTimeout()), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+/** When on-chain balance fetch fails, do not trust ledger — treat as 0 for payments. */
+function emptyOnChainBalance(): UnifiedBalanceSnapshot {
   return {
-    totalUsdc: amount,
-    totalConfirmedBalance: String(amount),
+    totalUsdc: 0,
+    totalConfirmedBalance: "0",
     breakdown: [],
   };
 }
@@ -120,22 +135,8 @@ export type EmbeddedWalletInfo = {
   usdcContractAddress: string;
 };
 
-export class CircleServiceError extends Error {
-  constructor(
-    message: string,
-    readonly code:
-      | "NOT_CONFIGURED"
-      | "WALLET_NOT_FOUND"
-      | "INSUFFICIENT_BALANCE"
-      | "UNSUPPORTED_CHAIN"
-      | "PAYMENT_REQUIRED"
-      | "NETWORK_ERROR"
-      | "SETTLEMENT_FAILED" = "SETTLEMENT_FAILED",
-  ) {
-    super(message);
-    this.name = "CircleServiceError";
-  }
-}
+export { CircleServiceError } from "@/services/circle-errors";
+import { CircleServiceError } from "@/services/circle-errors";
 
 function parseUsdcAmount(value: string | undefined): number {
   if (!value) return 0;
@@ -157,7 +158,7 @@ export async function getUnifiedBalance(walletId: string): Promise<UnifiedBalanc
   } catch (error) {
     if (error instanceof CircleServiceError) throw error;
     console.warn("[circleService] balance fetch failed, using ledger:", error);
-    return ledgerFallback(user.userId);
+    return emptyOnChainBalance();
   }
 }
 
@@ -168,16 +169,25 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
   const existing = userStore.getByUserId(userId);
   if (existing) {
     const unified = await getUnifiedBalance(existing.circleWalletId);
-    userStore.syncLedgerFromUnified(userId, unified.totalUsdc);
-    return buildWalletInfo(existing, unified);
+    const { getOnchainSettlementHoldUsdc } = await import(
+      "@/server/services/onchain-settlement"
+    );
+    const hold = getOnchainSettlementHoldUsdc(userId);
+    const synced = userStore.reconcileDepositsFromOnChain(
+      userId,
+      unified.totalUsdc,
+      hold,
+    );
+    return buildWalletInfo(synced, unified);
   }
 
   const env = getServerEnv();
   const client = getDcwClient();
+  const blockchains = dcwBlockchainsForApiKey(env.CIRCLE_API_KEY);
 
   const walletsResponse = await client.createWallets({
     accountType: "EOA",
-    blockchains: [...USER_WALLET_BLOCKCHAINS],
+    blockchains: [...blockchains],
     count: 1,
     walletSetId: env.CIRCLE_WALLET_SET_ID,
     idempotencyKey: randomUUID(),
@@ -192,20 +202,30 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
     );
   }
 
-  const record = userStore.createPlaceholder(userId, wallet.id, wallet.address);
   let unified: UnifiedBalanceSnapshot;
   try {
-    unified = await getUnifiedBalance(record.circleWalletId);
-    userStore.syncLedgerFromUnified(userId, unified.totalUsdc);
+    unified = await getUnifiedBalance(wallet.id);
   } catch {
     unified = {
-      totalUsdc: record.ledgerBalance,
-      totalConfirmedBalance: String(record.ledgerBalance),
+      totalUsdc: 0,
+      totalConfirmedBalance: "0",
       breakdown: [],
     };
   }
 
-  return buildWalletInfo(record, unified);
+  const synced = userStore.upsertFromClerk({
+    clerkId: userId,
+    circleWalletId: wallet.id,
+    address: wallet.address,
+    ledgerBalance: unified.totalUsdc,
+  });
+
+  return buildWalletInfo(synced, unified);
+}
+
+/** Provision Circle wallet + upsert SQLite + sync on-chain USDC (call on login / GET wallet). */
+export async function ensureClerkUserWalletSynced(clerkId: string): Promise<EmbeddedWalletInfo> {
+  return createUserEmbeddedWallet(clerkId);
 }
 
 function buildWalletInfo(
@@ -235,76 +255,30 @@ export type NanopaymentResult = {
   unifiedBalance: number;
   responseStatus: number;
   responsePreview: string;
+  /** Full API body for frontend formatting */
+  rawResponse: string;
+  generatedContent: string;
   paymentRequiredObserved: boolean;
+  /** Circle DCW user→master transfer id when settled on-chain */
+  onChainSettlementTxId?: string;
+  /** Queued batched settlement id (on-chain transfer runs async) */
+  onChainSettlementQueuedId?: string;
 };
-
-type PaymentRequiredProbe = {
-  status: number;
-  paymentRequired: boolean;
-  hint?: string;
-};
-
-async function probePaymentRequired(resourceUrl: string): Promise<PaymentRequiredProbe> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PAYMENT_FETCH_TIMEOUT_MS);
-
-  try {
-    const res = await fetch(resourceUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    return {
-      status: res.status,
-      paymentRequired: res.status === 402,
-      hint: res.status === 402 ? "HTTP 402 Payment Required" : undefined,
-    };
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new CircleServiceError(
-        `Marketplace probe timed out after ${PAYMENT_FETCH_TIMEOUT_MS}ms`,
-        "NETWORK_ERROR",
-      );
-    }
-    const message = error instanceof Error ? error.message : String(error);
-    throw new CircleServiceError(
-      `Network error while probing x402 resource: ${message}`,
-      "NETWORK_ERROR",
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function getMasterGatewayClient(chainId: SupportedChainId) {
-  if (gatewayClients.has(chainId)) {
-    return gatewayClients.get(chainId) as {
-      pay: (url: string) => Promise<{ status?: number; data?: unknown }>;
-    };
-  }
-
-  const env = getServerEnv();
-  const { GatewayClient } = await import("@circle-fin/x402-batching/client");
-  const client = new GatewayClient({
-    chain: gatewayChainKeyForChainId(chainId),
-    privateKey: env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`,
-  });
-  gatewayClients.set(chainId, client);
-  return client;
-}
 
 async function settleWithMasterAgent(
   resourceUrl: string,
   targetChainId: SupportedChainId,
+  minUsdc: number,
+  payOptions?: X402PayRequestInit,
 ): Promise<{ status?: number; data?: unknown }> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= PAYMENT_MAX_RETRIES; attempt++) {
     try {
-      const gateway = await getMasterGatewayClient(targetChainId);
-      return await gateway.pay(resourceUrl);
+      return await payX402Resource(resourceUrl, targetChainId, minUsdc, payOptions);
     } catch (error) {
       lastError = error;
+      if (error instanceof CircleServiceError) throw error;
       if (attempt < PAYMENT_MAX_RETRIES) {
         await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
       }
@@ -318,80 +292,21 @@ async function settleWithMasterAgent(
   );
 }
 
-/**
- * Simulates x402 (402 probe), verifies unified balance, settles on target chain via master Gateway, debits user ledger.
- */
-export async function handleNanopaymentX402(
-  userWalletId: string,
-  agentServiceId: string,
-  targetChainId: number,
-): Promise<NanopaymentResult> {
-  if (!isSupportedChainId(targetChainId)) {
-    throw new CircleServiceError(
-      `Unsupported targetChainId ${targetChainId}. Use ${BASE_NETWORK.id} (Base) or ${ARC_NETWORK.id} (Arc Testnet).`,
-      "UNSUPPORTED_CHAIN",
-    );
-  }
-
-  const user = userStore.getByWalletId(userWalletId);
-  if (!user) {
-    throw new CircleServiceError(`Unknown user wallet id: ${userWalletId}`, "WALLET_NOT_FOUND");
-  }
-
-  const agent = AGENTS.find((a) => a.id === agentServiceId);
-  if (!agent) {
-    throw new CircleServiceError(`Unknown agent service id: ${agentServiceId}`, "SETTLEMENT_FAILED");
-  }
-
-  const unified = await getUnifiedBalance(userWalletId);
-  if (unified.totalUsdc < agent.price) {
-    throw new CircleServiceError(
-      `Insufficient unified balance: need ${agent.price} USDC, have ${unified.totalUsdc} USDC`,
-      "INSUFFICIENT_BALANCE",
-    );
-  }
-
-  const resourceUrl = await resolveAgentServiceUrl(agentServiceId);
-
-  let probe: PaymentRequiredProbe;
-  try {
-    probe = await probePaymentRequired(resourceUrl);
-  } catch (error) {
-    if (error instanceof CircleServiceError) throw error;
-    throw error;
-  }
-
-  if (!probe.paymentRequired && probe.status !== 200) {
-    console.warn(
-      `[x402] Expected 402 from ${resourceUrl}, got ${probe.status}; continuing with master settlement`,
-    );
-  }
-
-  const response = await settleWithMasterAgent(resourceUrl, targetChainId);
-  const bodyText =
-    typeof response.data === "string"
-      ? response.data
-      : JSON.stringify(response.data ?? {});
-
-  const updated = userStore.debit(user.userId, agent.price, {
-    label: `${agent.name} · Nanopayment`,
-    agentId: agentServiceId,
-  });
-
-  const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
-  userStore.syncLedgerFromUnified(user.userId, refreshed.totalUsdc);
-
-  return {
-    agentServiceId,
-    resourceUrl,
-    targetChainId,
-    chargedUsdc: agent.price,
-    ledgerBalance: updated.ledgerBalance,
-    unifiedBalance: refreshed.totalUsdc,
-    responseStatus: response.status ?? 200,
-    responsePreview: bodyText.slice(0, 500),
-    paymentRequiredObserved: probe.paymentRequired,
-  };
+export async function settleWithMasterAgentBounded(
+  resourceUrl: string,
+  targetChainId: SupportedChainId,
+  minUsdc: number,
+  payOptions?: X402PayRequestInit,
+): Promise<{ status?: number; data?: unknown }> {
+  return withTimeout(
+    settleWithMasterAgent(resourceUrl, targetChainId, minUsdc, payOptions),
+    MARKETPLACE_SETTLE_TIMEOUT_MS,
+    () =>
+      new CircleServiceError(
+        `AI Agent Marketplace did not respond within ${MARKETPLACE_SETTLE_TIMEOUT_MS}ms`,
+        "TIMEOUT",
+      ),
+  );
 }
 
 export function circleRuntimeReady(): boolean {

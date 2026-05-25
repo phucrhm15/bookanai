@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ClerkProvider } from "@clerk/tanstack-react-start";
 import {
   Outlet,
   Link,
@@ -10,6 +11,8 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { clerkAppearance } from "@/lib/clerk-appearance";
+import { LocaleProvider } from "@/lib/i18n/locale-context";
 
 function NotFoundComponent() {
   return (
@@ -68,23 +71,31 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+  userId?: string;
+}>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Book your slay AI" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Book your slay AI" },
+      { title: "Nano.Agent — x402 AI agents · USDC on Base" },
+      {
+        name: "description",
+        content: "Messari & Perplexity qua x402, định dạng thread X. Circle wallets + Clerk.",
+      },
+      { property: "og:title", content: "Nano.Agent" },
+      {
+        property: "og:description",
+        content: "Pay-per-call AI agents with USDC micropayments on Base.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "Lovable App" },
-      { name: "twitter:description", content: "Book your slay AI" },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/IFj2AZ9RyNXbenqX60XtYF2I6Cs1/social-images/social-1779422534667-122013208_2839756459592444_2100921657422224457_n.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/IFj2AZ9RyNXbenqX60XtYF2I6Cs1/social-images/social-1779422534667-122013208_2839756459592444_2100921657422224457_n.webp" },
+      { name: "twitter:title", content: "Nano.Agent" },
+      {
+        name: "twitter:description",
+        content: "x402 data & search agents — USDC on Base.",
+      },
     ],
     links: [
       {
@@ -117,8 +128,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-    </QueryClientProvider>
+    <LocaleProvider>
+      <ClerkProvider appearance={clerkAppearance}>
+        <QueryClientProvider client={queryClient}>
+          <Outlet />
+        </QueryClientProvider>
+      </ClerkProvider>
+    </LocaleProvider>
   );
 }

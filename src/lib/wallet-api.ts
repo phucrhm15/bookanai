@@ -1,4 +1,5 @@
 import { ARC_NETWORK, BASE_NETWORK, USDC_CONTRACT_ADDRESS } from "@/lib/mock-data";
+import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
 import type { UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
 export type WalletNetworkInfo = {
@@ -20,6 +21,7 @@ export type WalletApiResponse = {
     arc: WalletNetworkInfo;
   };
   network: typeof ARC_NETWORK;
+  preferredChainId?: number;
   transactions: {
     id: string;
     label: string;
@@ -39,17 +41,24 @@ export type NanopaymentApiResponse = {
   unifiedBalance: number;
   responseStatus: number;
   responsePreview: string;
+  rawResponse: string;
+  generatedContent: string;
   paymentRequiredObserved?: boolean;
+  onChainSettlementTxId?: string;
+  onChainSettlementQueuedId?: string;
 };
 
-export const DEMO_USER_ID = "demo-user";
+const apiFetch = (input: string, init?: RequestInit) =>
+  fetch(input, { ...init, credentials: "same-origin" });
 
-/** Call after user registration to provision their embedded Circle wallet. */
-export async function provisionWallet(userId: string): Promise<Pick<WalletApiResponse, "userId" | "walletId" | "address" | "ledgerBalance" | "unifiedBalance">> {
-  const res = await fetch("/api/wallet", {
+/** Provision embedded Circle wallet for the signed-in Clerk user. */
+export async function provisionWallet(): Promise<
+  Pick<WalletApiResponse, "userId" | "walletId" | "address" | "ledgerBalance" | "unifiedBalance">
+> {
+  const res = await apiFetch("/api/wallet", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -58,8 +67,12 @@ export async function provisionWallet(userId: string): Promise<Pick<WalletApiRes
   return res.json();
 }
 
-export async function fetchWallet(userId: string = DEMO_USER_ID): Promise<WalletApiResponse> {
-  const res = await fetch(`/api/wallet?userId=${encodeURIComponent(userId)}`);
+/** Load wallet for the signed-in Clerk user (session cookie). */
+export async function fetchWallet(): Promise<WalletApiResponse> {
+  const res = await apiFetch("/api/wallet");
+  if (res.status === 401) {
+    throw new Error("Sign in required");
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error?: string }).error ?? "Failed to load wallet");
@@ -71,15 +84,34 @@ export async function postNanopayment(
   userWalletId: string,
   agentServiceId: string,
   targetChainId?: number,
+  prompt?: string,
+  idempotencyKey?: string,
 ): Promise<NanopaymentApiResponse> {
-  const res = await fetch("/api/wallet/nanopayment", {
+  const res = await apiFetch("/api/wallet/nanopayment", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userWalletId, agentServiceId, targetChainId }),
+    body: JSON.stringify({
+      userWalletId,
+      agentServiceId,
+      targetChainId,
+      prompt,
+      idempotencyKey,
+    }),
   });
+  if (res.status === 401) {
+    throw new Error("Sign in required");
+  }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error?: string }).error ?? "Nanopayment failed");
+    const err = (await res.json().catch(() => null)) as {
+      error?: string;
+      message?: string;
+      code?: string;
+    } | null;
+    const message =
+      err?.error ??
+      err?.message ??
+      (res.statusText ? `${res.statusText} (HTTP ${res.status})` : `HTTP ${res.status}`);
+    throw new Error(formatPaymentErrorForUser(message));
   }
   return res.json() as Promise<NanopaymentApiResponse>;
 }

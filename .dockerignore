@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.env*
+!.env.local.example
+data
+*.db
+*.db-*
+repomix-output.xml
+.cursor
+agent-transcripts
+README.md
+DEPLOY.md
+Dockerfile
+docker-compose*.yml
+nginx

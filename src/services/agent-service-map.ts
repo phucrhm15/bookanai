@@ -1,13 +1,12 @@
-const DISCOVERY_URL =
-  process.env.X402_DISCOVERY_URL ?? "https://api.circle.com/v2/x402/discovery/resources";
+import { getServerEnv } from "@/server/config/env";
 
-type DiscoveryAccept = {
+export type DiscoveryAccept = {
   scheme: string;
   network: string;
   amount: string;
 };
 
-type DiscoveryItem = {
+export type DiscoveryItem = {
   resource: string;
   type: string;
   accepts?: DiscoveryAccept[];
@@ -17,76 +16,155 @@ type DiscoveryResponse = {
   items?: DiscoveryItem[];
 };
 
-/** Mock agent id → keywords used to pick an x402 marketplace resource URL. */
-export const AGENT_DISCOVERY_KEYWORDS: Record<string, string[]> = {
-  "alpha-caller-x": ["coingecko", "coins", "market", "price"],
-  "meme-image-gen": ["image", "generate", "visual"],
-  "rwa-thread-writer": ["treasury", "rwa", "tokenized"],
-  "crypto-writer": ["coingecko", "coins", "categories"],
-  "shitpost-9000": ["sentiment", "social", "twitter"],
-  "sentiment-scanner": ["sentiment", "mood", "social"],
+/**
+ * Studio agent id → Circle x402 Discovery resource URL (or Messari direct x402 URL).
+ * Each URL must be payable via x402 (HTTP 402 + USDC) at resolve time.
+ */
+export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
+  /** Messari x402 — /details returns 403 after pay; /ath works with exact EIP-3009 */
+  "messari-analyst": "https://api.messari.io/metrics/v2/assets/ath",
+  "perplexity-social": "https://api.aisa.one/apis/v2/perplexity/sonar",
 };
 
-/** Curated fallbacks when discovery has no keyword match (Arc-friendly HTTP resources). */
-const AGENT_FALLBACK_URLS: Record<string, string> = {
-  "alpha-caller-x": "https://api.aisa.one/apis/v2/coingecko/coins/categories",
-  "meme-image-gen": "https://api.aisa.one/apis/v2/coingecko/coins/categories",
-  "rwa-thread-writer": "https://api.aisa.one/apis/v2/coingecko/coins/categories",
-  "crypto-writer": "https://api.aisa.one/apis/v2/coingecko/coins/categories",
-  "shitpost-9000": "https://api.aisa.one/apis/v2/coingecko/coins/categories",
-  "sentiment-scanner": "https://api.aisa.one/apis/v2/coingecko/coins/categories",
+/** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
+const DIRECT_X402_HOSTS = new Set(["api.messari.io"]);
+
+export type ResolvedAgentResource = {
+  resourceUrl: string;
+  discoveryItem: DiscoveryItem;
 };
 
 let discoveryCache: DiscoveryItem[] | undefined;
 let discoveryFetchedAt = 0;
 const CACHE_MS = 5 * 60 * 1000;
 
+const AGENT_NOT_FOUND =
+  "Agent không tồn tại hoặc đã bị gỡ khỏi chợ x402";
+
+function discoveryUrl(): string {
+  return getServerEnv().X402_DISCOVERY_URL;
+}
+
+function discoveryCatalogHosts(items: DiscoveryItem[]): Set<string> {
+  const hosts = new Set<string>();
+  for (const item of items) {
+    if (!item.resource) continue;
+    try {
+      hosts.add(new URL(item.resource).hostname.toLowerCase());
+    } catch {
+      // skip malformed catalog entries
+    }
+  }
+  return hosts;
+}
+
+/** Host must be listed on Circle Discovery or belong to Circle x402 ecosystem (HTTPS only). */
+function assertX402ResourceHost(
+  resourceUrl: string,
+  catalogItems: DiscoveryItem[],
+): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(resourceUrl);
+  } catch {
+    throw new Error(`${AGENT_NOT_FOUND}: URL không hợp lệ`);
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error(`${AGENT_NOT_FOUND}: chỉ chấp nhận HTTPS`);
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const catalogHosts = discoveryCatalogHosts(catalogItems);
+
+  if (catalogHosts.has(host) || DIRECT_X402_HOSTS.has(host)) {
+    return;
+  }
+
+  const extra =
+    process.env.X402_ALLOWED_RESOURCE_HOSTS?.split(",")
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean) ?? [];
+
+  const circleEcosystem =
+    host === "circle.com" ||
+    host.endsWith(".circle.com") ||
+    host.endsWith(".circleapis.com");
+
+  const explicitlyAllowed = extra.some(
+    (allowed) => host === allowed || host.endsWith(`.${allowed}`),
+  );
+
+  if (!circleEcosystem && !explicitlyAllowed) {
+    throw new Error(
+      `${AGENT_NOT_FOUND}: domain "${host}" không thuộc x402 ecosystem của Circle`,
+    );
+  }
+}
+
 export async function fetchDiscoveryResources(): Promise<DiscoveryItem[]> {
   const now = Date.now();
   if (discoveryCache && now - discoveryFetchedAt < CACHE_MS) {
     return discoveryCache;
   }
-  const res = await fetch(DISCOVERY_URL, {
+
+  const url = discoveryUrl();
+  const res = await fetch(url, {
     headers: { Accept: "application/json" },
   });
+
   if (!res.ok) {
-    throw new Error(`Discovery API failed: ${res.status} ${res.statusText}`);
+    throw new Error(`X402 Discovery failed (${url}): ${res.status} ${res.statusText}`);
   }
+
   const body = (await res.json()) as DiscoveryResponse;
   discoveryCache = body.items ?? [];
   discoveryFetchedAt = now;
   return discoveryCache;
 }
 
-function scoreResource(resource: string, keywords: string[]): number {
-  const lower = resource.toLowerCase();
-  return keywords.reduce((score, kw) => (lower.includes(kw.toLowerCase()) ? score + 1 : score), 0);
+function findDiscoveryItem(
+  items: DiscoveryItem[],
+  resourceUrl: string,
+): DiscoveryItem | undefined {
+  return items.find(
+    (item) => item.type === "http" && item.resource === resourceUrl,
+  );
 }
 
-export async function resolveAgentServiceUrl(agentId: string): Promise<string> {
-  const keywords = AGENT_DISCOVERY_KEYWORDS[agentId];
-  if (!keywords?.length) {
-    throw new Error(`Unknown agent service id: ${agentId}`);
+/**
+ * Resolve a paid x402 resource URL for a Studio agent id.
+ * Circle Discovery exact match first; Messari uses direct x402 catalog when absent.
+ */
+export async function resolveAgentResource(
+  agentId: string,
+): Promise<ResolvedAgentResource> {
+  const mappedUrl = STUDIO_AGENT_RESOURCES[agentId];
+  if (!mappedUrl) {
+    throw new Error(`Unknown Studio agent id: ${agentId}`);
   }
 
-  try {
-    const items = await fetchDiscoveryResources();
-    let best: DiscoveryItem | undefined;
-    let bestScore = 0;
-    for (const item of items) {
-      if (item.type !== "http" || !item.resource) continue;
-      const score = scoreResource(item.resource, keywords);
-      if (score > bestScore) {
-        bestScore = score;
-        best = item;
-      }
+  const items = await fetchDiscoveryResources();
+  let discoveryItem = findDiscoveryItem(items, mappedUrl);
+
+  if (!discoveryItem) {
+    const host = new URL(mappedUrl).hostname.toLowerCase();
+    if (DIRECT_X402_HOSTS.has(host)) {
+      discoveryItem = { resource: mappedUrl, type: "http" };
     }
-    if (best?.resource) return best.resource;
-  } catch (err) {
-    console.warn("[agent-service-map] discovery lookup failed, using fallback:", err);
   }
 
-  const fallback = AGENT_FALLBACK_URLS[agentId];
-  if (!fallback) throw new Error(`No marketplace URL for agent: ${agentId}`);
-  return fallback;
+  if (!discoveryItem?.resource) {
+    throw new Error(AGENT_NOT_FOUND);
+  }
+
+  assertX402ResourceHost(discoveryItem.resource, items);
+
+  return { resourceUrl: discoveryItem.resource, discoveryItem };
+}
+
+/** @deprecated use resolveAgentResource */
+export async function resolveAgentServiceUrl(agentId: string): Promise<string> {
+  const resolved = await resolveAgentResource(agentId);
+  return resolved.resourceUrl;
 }

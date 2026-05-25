@@ -4,8 +4,10 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/top-bar";
 import { AgentProvider } from "@/lib/agent-store";
 import { Toaster } from "@/components/ui/sonner";
+import { ensureAuthenticated } from "@/lib/auth-server";
 
 export const Route = createFileRoute("/_app")({
+  beforeLoad: async () => ensureAuthenticated(),
   component: AppLayout,
 });
 

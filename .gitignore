@@ -8,6 +8,13 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+data/
+circle-entity-recovery.dat
+**/circle-entity-recovery.dat
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
 dist
 dist-ssr
 .output
@@ -30,3 +37,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# Generated / local dumps
+repomix-output.xml

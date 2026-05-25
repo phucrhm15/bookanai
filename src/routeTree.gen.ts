@@ -10,21 +10,41 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
-import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
+import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as AppWalletRouteImport } from './routes/_app.wallet'
 import { Route as AppStudioRouteImport } from './routes/_app.studio'
+import { Route as AppMarketplaceRouteImport } from './routes/_app.marketplace'
 import { Route as ApiWalletIndexRouteImport } from './routes/api/wallet/index'
 import { Route as ApiWalletNanopaymentRouteImport } from './routes/api/wallet/nanopayment'
 import { Route as ApiMasterStatusRouteImport } from './routes/api/master/status'
+import { Route as ApiCronSettleBatchRouteImport } from './routes/api/cron/settle-batch'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppIndexRoute = AppIndexRouteImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppRoute,
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpSplatRoute = SignUpSplatRouteImport.update({
+  id: '/sign-up/$',
+  path: '/sign-up/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInSplatRoute = SignInSplatRouteImport.update({
+  id: '/sign-in/$',
+  path: '/sign-in/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppWalletRoute = AppWalletRouteImport.update({
   id: '/wallet',
@@ -34,6 +54,11 @@ const AppWalletRoute = AppWalletRouteImport.update({
 const AppStudioRoute = AppStudioRouteImport.update({
   id: '/studio',
   path: '/studio',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
+  id: '/marketplace',
+  path: '/marketplace',
   getParentRoute: () => AppRoute,
 } as any)
 const ApiWalletIndexRoute = ApiWalletIndexRouteImport.update({
@@ -51,29 +76,49 @@ const ApiMasterStatusRoute = ApiMasterStatusRouteImport.update({
   path: '/api/master/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronSettleBatchRoute = ApiCronSettleBatchRouteImport.update({
+  id: '/api/cron/settle-batch',
+  path: '/api/cron/settle-batch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute
+  '/': typeof IndexRoute
+  '/marketplace': typeof AppMarketplaceRoute
   '/studio': typeof AppStudioRoute
   '/wallet': typeof AppWalletRoute
+  '/api/health': typeof ApiHealthRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
+  '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
   '/api/master/status': typeof ApiMasterStatusRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
   '/api/wallet/': typeof ApiWalletIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
+  '/marketplace': typeof AppMarketplaceRoute
   '/studio': typeof AppStudioRoute
   '/wallet': typeof AppWalletRoute
-  '/': typeof AppIndexRoute
+  '/api/health': typeof ApiHealthRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
+  '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
   '/api/master/status': typeof ApiMasterStatusRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
   '/api/wallet': typeof ApiWalletIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/_app/marketplace': typeof AppMarketplaceRoute
   '/_app/studio': typeof AppStudioRoute
   '/_app/wallet': typeof AppWalletRoute
-  '/_app/': typeof AppIndexRoute
+  '/api/health': typeof ApiHealthRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
+  '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
   '/api/master/status': typeof ApiMasterStatusRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
   '/api/wallet/': typeof ApiWalletIndexRoute
@@ -82,32 +127,52 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/marketplace'
     | '/studio'
     | '/wallet'
+    | '/api/health'
+    | '/sign-in/$'
+    | '/sign-up/$'
+    | '/api/cron/settle-batch'
     | '/api/master/status'
     | '/api/wallet/nanopayment'
     | '/api/wallet/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
+    | '/marketplace'
     | '/studio'
     | '/wallet'
-    | '/'
+    | '/api/health'
+    | '/sign-in/$'
+    | '/sign-up/$'
+    | '/api/cron/settle-batch'
     | '/api/master/status'
     | '/api/wallet/nanopayment'
     | '/api/wallet'
   id:
     | '__root__'
+    | '/'
     | '/_app'
+    | '/_app/marketplace'
     | '/_app/studio'
     | '/_app/wallet'
-    | '/_app/'
+    | '/api/health'
+    | '/sign-in/$'
+    | '/sign-up/$'
+    | '/api/cron/settle-batch'
     | '/api/master/status'
     | '/api/wallet/nanopayment'
     | '/api/wallet/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  ApiHealthRoute: typeof ApiHealthRoute
+  SignInSplatRoute: typeof SignInSplatRoute
+  SignUpSplatRoute: typeof SignUpSplatRoute
+  ApiCronSettleBatchRoute: typeof ApiCronSettleBatchRoute
   ApiMasterStatusRoute: typeof ApiMasterStatusRoute
   ApiWalletNanopaymentRoute: typeof ApiWalletNanopaymentRoute
   ApiWalletIndexRoute: typeof ApiWalletIndexRoute
@@ -122,12 +187,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/': {
-      id: '/_app/'
+    '/': {
+      id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AppIndexRouteImport
-      parentRoute: typeof AppRoute
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-up/$': {
+      id: '/sign-up/$'
+      path: '/sign-up/$'
+      fullPath: '/sign-up/$'
+      preLoaderRoute: typeof SignUpSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in/$': {
+      id: '/sign-in/$'
+      path: '/sign-in/$'
+      fullPath: '/sign-in/$'
+      preLoaderRoute: typeof SignInSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/wallet': {
       id: '/_app/wallet'
@@ -141,6 +227,13 @@ declare module '@tanstack/react-router' {
       path: '/studio'
       fullPath: '/studio'
       preLoaderRoute: typeof AppStudioRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/marketplace': {
+      id: '/_app/marketplace'
+      path: '/marketplace'
+      fullPath: '/marketplace'
+      preLoaderRoute: typeof AppMarketplaceRouteImport
       parentRoute: typeof AppRoute
     }
     '/api/wallet/': {
@@ -164,25 +257,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMasterStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/settle-batch': {
+      id: '/api/cron/settle-batch'
+      path: '/api/cron/settle-batch'
+      fullPath: '/api/cron/settle-batch'
+      preLoaderRoute: typeof ApiCronSettleBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppMarketplaceRoute: typeof AppMarketplaceRoute
   AppStudioRoute: typeof AppStudioRoute
   AppWalletRoute: typeof AppWalletRoute
-  AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppMarketplaceRoute: AppMarketplaceRoute,
   AppStudioRoute: AppStudioRoute,
   AppWalletRoute: AppWalletRoute,
-  AppIndexRoute: AppIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  ApiHealthRoute: ApiHealthRoute,
+  SignInSplatRoute: SignInSplatRoute,
+  SignUpSplatRoute: SignUpSplatRoute,
+  ApiCronSettleBatchRoute: ApiCronSettleBatchRoute,
   ApiMasterStatusRoute: ApiMasterStatusRoute,
   ApiWalletNanopaymentRoute: ApiWalletNanopaymentRoute,
   ApiWalletIndexRoute: ApiWalletIndexRoute,

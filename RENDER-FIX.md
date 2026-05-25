@@ -25,7 +25,11 @@ Trong tab **Logs**, kéo xuống **cuối**, tìm dòng:
 
 Gửi 10–20 dòng cuối nếu vẫn fail.
 
-## 4. Vẫn fail? — Đổi sang Node (không Docker)
+## 4. Lỗi `package-lock.json` out of sync / `utf-8-validate`
+
+Đã sửa trong repo: chạy `npm install` local rồi push `package-lock.json` mới + Dockerfile **Node 22**.
+
+## 5. Vẫn fail? — Đổi sang Node (không Docker)
 
 **Settings** → đổi **Language** từ Docker sang **Node**:
 
@@ -33,11 +37,11 @@ Gửi 10–20 dòng cuối nếu vẫn fail.
 |-----|---------|
 | **Build Command** | `npm ci && npm rebuild better-sqlite3` |
 | **Start Command** | `npm run start:prod` |
-| **Node version** | `20` |
+| **Node version** | `22` |
 
 Giữ nguyên Environment Variables. Save → Deploy.
 
-## 5. Sau khi Live
+## 6. Sau khi Live
 
 - URL: `https://bookanai.onrender.com` (hoặc URL Render cấp)
 - Clerk: thêm domain + `/sign-in`, `/sign-up`, `/marketplace`

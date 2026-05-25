@@ -1,5 +1,5 @@
-# Render / VPS — Node 20 + SQLite (better-sqlite3 native build)
-FROM node:20-bookworm-slim
+# Render / VPS — Node 22 + SQLite (TanStack Start requires >=22.12)
+FROM node:22-bookworm-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ curl \
@@ -9,7 +9,6 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-# Render free build VMs are memory-tight — skip lifecycle scripts until rebuild step
 ENV NODE_OPTIONS=--max-old-space-size=1024
 RUN npm ci --ignore-scripts --no-audit --no-fund
 

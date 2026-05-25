@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { BadgeCheck, Check, Copy } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,18 +25,47 @@ function toUnicodeSansSerifBoldChar(char: string): string {
   return char;
 }
 
-function boldifyAlphanumeric(segment: string): string {
+function boldifyAsciiLetters(segment: string): string {
   return [...segment].map(toUnicodeSansSerifBoldChar).join("");
 }
 
+/** X only has sans-serif bold glyphs for A–Z / a–z / 0–9 — not Vietnamese diacritics. */
+function canUseUnicodeBoldOnX(inner: string): boolean {
+  return /^[\x20-\x7E]+$/.test(inner) && /[A-Za-z]/.test(inner);
+}
+
 /**
- * Converts `**markdown bold**` spans to Unicode Mathematical Sans-Serif Bold
- * so pasted text on X keeps visual weight without Markdown.
+ * Converts `**markdown bold**` to Unicode bold for X paste when safe (ASCII only).
+ * Vietnamese / accented text stays normal so X does not mix bold + fallback fonts.
  */
 export function convertMarkdownToUnicodeBold(input: string): string {
-  return input.replace(/\*\*([^*]+)\*\*/g, (_match, inner: string) =>
-    boldifyAlphanumeric(inner),
-  );
+  return input.replace(/\*\*([^*]+)\*\*/g, (_match, inner: string) => {
+    const text = inner.trim();
+    if (canUseUnicodeBoldOnX(text)) {
+      return boldifyAsciiLetters(text);
+    }
+    return text;
+  });
+}
+
+/** In-app preview: Unicode bold for ASCII titles, normal <strong> for Vietnamese. */
+function renderMarkdownBoldPreview(input: string): ReactNode[] {
+  const parts = input.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    const match = part.match(/^\*\*([^*]+)\*\*$/);
+    if (!match) {
+      return <span key={index}>{part}</span>;
+    }
+    const text = match[1].trim();
+    if (canUseUnicodeBoldOnX(text)) {
+      return <span key={index}>{boldifyAsciiLetters(text)}</span>;
+    }
+    return (
+      <strong key={index} className="font-semibold">
+        {text}
+      </strong>
+    );
+  });
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -303,8 +332,10 @@ export function TweetThreadPreview({
   const tweets = useMemo(() => {
     if (!rawResponse?.trim()) return [];
     const formatted = parseAgentData(agentId, rawResponse, t);
-    const forDisplay = convertMarkdownToUnicodeBold(formatted);
-    return splitIntoTweets(forDisplay);
+    return splitIntoTweets(formatted).map((chunk) => ({
+      preview: chunk,
+      copy: convertMarkdownToUnicodeBold(chunk),
+    }));
   }, [agentId, rawResponse, t]);
 
   const handleCopy = useCallback((text: string, index: number) => {
@@ -352,7 +383,7 @@ export function TweetThreadPreview({
 
   return (
     <div className="space-y-3">
-      {tweets.map((tweet, index) => (
+      {tweets.map(({ preview, copy }, index) => (
         <article
           key={index}
           className="rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur-xl"
@@ -375,7 +406,7 @@ export function TweetThreadPreview({
                   variant="outline"
                   size="sm"
                   className="h-7 shrink-0 gap-1 px-2 text-[10px] uppercase tracking-wider"
-                  onClick={() => handleCopy(tweet, index)}
+                  onClick={() => handleCopy(copy, index)}
                 >
                   {copiedIndex === index ? (
                     <>
@@ -396,7 +427,7 @@ export function TweetThreadPreview({
                   index > 0 && "border-l-2 border-primary/30 pl-3",
                 )}
               >
-                {tweet}
+                {renderMarkdownBoldPreview(preview)}
               </div>
             </div>
           </div>

@@ -23,7 +23,8 @@ ENV NODE_OPTIONS=--max-old-space-size=448
 ENV APP_ROOT=/app
 ENV HOST=0.0.0.0
 ENV PORT=3000
-ENV DATABASE_URL=file:/tmp/bookanai.db
+# Mount Render persistent disk at /data (Starter+). Override in Dashboard if needed.
+ENV DATABASE_URL=file:/data/bookanai.db
 
 EXPOSE 3000
 

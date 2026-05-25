@@ -16,6 +16,7 @@ import { MARKETPLACE_SETTLE_TIMEOUT_MS } from "@/server/config/api-timeouts";
 import { dcwBlockchainsForApiKey } from "@/lib/circle-dcw-blockchains";
 import { getServerEnv, isCircleConfigured } from "@/server/config/env";
 import { userStore } from "@/server/storage/user-store";
+import { findExistingCircleWalletForClerk } from "@/server/services/circle-wallet-lookup";
 import { payX402Resource, type X402PayRequestInit } from "@/server/services/x402-master-pay";
 import type { ChainBalanceBreakdown, UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
@@ -183,6 +184,44 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
 
   const env = getServerEnv();
   const client = getDcwClient();
+
+  const reused = await findExistingCircleWalletForClerk(
+    client,
+    env.CIRCLE_WALLET_SET_ID,
+    userId,
+  );
+  if (reused) {
+    let unified: UnifiedBalanceSnapshot;
+    try {
+      unified = await getUnifiedBalance(reused.id);
+    } catch {
+      unified = {
+        totalUsdc: reused.usdcBalance,
+        totalConfirmedBalance: String(reused.usdcBalance),
+        breakdown: [],
+      };
+    }
+    const { getOnchainSettlementHoldUsdc } = await import(
+      "@/server/services/onchain-settlement"
+    );
+    const hold = getOnchainSettlementHoldUsdc(userId);
+    userStore.upsertFromClerk({
+      clerkId: userId,
+      circleWalletId: reused.id,
+      address: reused.address,
+      ledgerBalance: unified.totalUsdc,
+    });
+    const synced = userStore.reconcileDepositsFromOnChain(
+      userId,
+      unified.totalUsdc,
+      hold,
+    );
+    console.info(
+      `[circleService] Re-linked existing Circle wallet ${reused.address} for ${userId}`,
+    );
+    return buildWalletInfo(synced, unified);
+  }
+
   const blockchains = dcwBlockchainsForApiKey(env.CIRCLE_API_KEY);
 
   const walletsResponse = await client.createWallets({

@@ -7,6 +7,8 @@ const USER_USDC_RE =
   /Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient USDC|khả dụng|Insufficient balance|Content Credits/i;
 const GAS_RE =
   /native token|insufficient funds for gas|max fee per gas|gas required exceeds|ETH gas/i;
+const NETWORK_SCHEME_RE =
+  /No network\/scheme registered|x402Version|paymentRequirements|eip155:137|GatewayWalletBatched/i;
 
 function spendableLooksZero(message: string): boolean {
   const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
@@ -67,6 +69,21 @@ export function formatPaymentErrorForUser(
       (addr
         ? `Admin: send ~0.001–0.002 ETH (Base) to ${addr} · npm run show:x402`
         : "Admin: npm run show:x402 — fund ETH on the printed address.")
+    );
+  }
+
+  if (NETWORK_SCHEME_RE.test(message)) {
+    if (locale === "vi") {
+      return (
+        "Agent này hiện yêu cầu mạng thanh toán khác (thấy eip155:137 = Polygon), " +
+        "trong khi hệ thống đang settle x402 trên Base (8453). " +
+        "Đã bật auto-route cho Base/Polygon, nhưng ví master cần có USDC (và gas) trên mạng mà agent yêu cầu."
+      );
+    }
+    return (
+      "This agent currently requires a different payment network (detected eip155:137 = Polygon), " +
+      "while the app settles x402 on Base (8453). " +
+      "Auto-routing is enabled for Base/Polygon, but the master wallet must have USDC (and gas) on the required network."
     );
   }
 

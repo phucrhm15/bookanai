@@ -39,6 +39,19 @@ function rpcUrlCandidates(): string[] {
   );
 }
 
+function polygonRpcCandidates(): string[] {
+  const primary = process.env.POLYGON_RPC_URL?.trim();
+  return [primary, "https://polygon-rpc.com", "https://rpc.ankr.com/polygon"].filter(
+    (url, index, all) => Boolean(url) && all.indexOf(url) === index,
+  ) as string[];
+}
+
+function rpcUrlForChain(chainId: number): string | undefined {
+  if (chainId === 8453) return rpcUrlCandidates()[0];
+  if (chainId === 137) return polygonRpcCandidates()[0];
+  return undefined;
+}
+
 function parseResponseBody(text: string): unknown {
   const trimmed = text.trim();
   if (!trimmed) return "";
@@ -46,6 +59,37 @@ function parseResponseBody(text: string): unknown {
     return JSON.parse(trimmed) as unknown;
   } catch {
     return trimmed;
+  }
+}
+
+type PaymentRequiredAccept = {
+  network?: string;
+  asset?: string;
+  amount?: string;
+  maxAmountRequired?: string;
+};
+
+type PaymentRequiredHeaderPayload = {
+  accepts?: PaymentRequiredAccept[];
+};
+
+function chainIdFromEip155(network?: string): number | undefined {
+  if (!network) return undefined;
+  const m = network.match(/eip155:(\d+)/i);
+  return m ? Number(m[1]) : undefined;
+}
+
+function parsePaymentRequiredAcceptsFromHeader(response: Response): PaymentRequiredAccept[] {
+  const raw =
+    response.headers.get("PAYMENT-REQUIRED") ?? response.headers.get("payment-required");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(raw, "base64").toString("utf8"),
+    ) as PaymentRequiredHeaderPayload;
+    return Array.isArray(parsed.accepts) ? parsed.accepts : [];
+  } catch {
+    return [];
   }
 }
 
@@ -77,22 +121,6 @@ async function ensureGatewayLiquidity(
   }
 }
 
-async function ensureWalletUsdc(
-  gateway: GatewayClient,
-  minUsdc: number,
-): Promise<void> {
-  const wallet = await gateway.getUsdcBalance();
-  const available = Number.parseFloat(wallet.formatted);
-  if (!Number.isFinite(available) || available < minUsdc) {
-    throw new CircleServiceError(
-      `Ví Master thiếu USDC on-chain cho x402: có ${wallet.formatted}, cần ~${minUsdc}. ` +
-        `Nạp USDC (Base) vào ví x402 ${masterDepositorAddress()} — không phải ví Content Credits của user. ` +
-        `Messari: USDC trực tiếp trên EOA này. Perplexity: npm run gateway:deposit`,
-      "INSUFFICIENT_BALANCE",
-    );
-  }
-}
-
 async function payViaGateway(
   gateway: GatewayClient,
   resourceUrl: string,
@@ -109,25 +137,13 @@ async function payViaGateway(
 }
 
 async function payViaExactEvm(
-  gateway: GatewayClient,
   resourceUrl: string,
   chainId: SupportedChainId,
   minUsdc: number,
   init?: X402PayRequestInit,
 ): Promise<X402PayResult> {
-  await ensureWalletUsdc(gateway, minUsdc);
-
   const env = getServerEnv();
   const account = privateKeyToAccount(env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`);
-  const rpcUrl = rpcUrlCandidates()[0];
-
-  const coreClient = new x402Client();
-  registerExactEvmScheme(coreClient, {
-    signer: account,
-    networks: [`eip155:${chainId}`],
-    schemeOptions: { [chainId]: { rpcUrl } },
-  });
-  const httpClient = new x402HTTPClient(coreClient);
 
   const method = init?.method ?? "GET";
   const headers: Record<string, string> = {
@@ -151,6 +167,25 @@ async function payViaExactEvm(
   let response = await doFetch();
 
   if (response.status === 402) {
+    const accepts = parsePaymentRequiredAcceptsFromHeader(response);
+    const requiredChainIds = accepts
+      .map((a) => chainIdFromEip155(a.network))
+      .filter((id): id is number => Number.isFinite(id));
+    const candidateChains = Array.from(new Set([chainId, ...requiredChainIds, 8453, 137]));
+    const schemeOptions: Record<number, { rpcUrl: string }> = {};
+    for (const c of candidateChains) {
+      const rpcUrl = rpcUrlForChain(c);
+      if (rpcUrl) schemeOptions[c] = { rpcUrl };
+    }
+
+    const coreClient = new x402Client();
+    registerExactEvmScheme(coreClient, {
+      signer: account,
+      networks: candidateChains.map((c) => `eip155:${c}`),
+      schemeOptions,
+    });
+    const httpClient = new x402HTTPClient(coreClient);
+
     const body402 = await response
       .clone()
       .json()
@@ -216,11 +251,11 @@ export async function payX402Resource(
         message.includes("Gateway batching") ||
         message.includes("No Gateway batching")
       ) {
-        return payViaExactEvm(gateway, resourceUrl, chainId, minUsdc, init);
+        return payViaExactEvm(resourceUrl, chainId, minUsdc, init);
       }
       throw error;
     }
   }
 
-  return payViaExactEvm(gateway, resourceUrl, chainId, minUsdc, init);
+  return payViaExactEvm(resourceUrl, chainId, minUsdc, init);
 }

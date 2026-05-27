@@ -193,16 +193,17 @@ export async function resolveAgentResource(
     throw new Error(`Unknown Studio agent id: ${agentId}`);
   }
 
-  const items = await fetchDiscoveryResources();
-  let discoveryItem = findDiscoveryItem(items, mappedUrl);
-
-  if (!discoveryItem && isDirectX402MappedUrl(mappedUrl)) {
-    discoveryItem = { resource: mappedUrl, type: "http" };
+  // Mapped Studio agents always resolve — Discovery enriches accepts/price when listed.
+  let items: DiscoveryItem[] = [];
+  try {
+    items = await fetchDiscoveryResources();
+  } catch (error) {
+    console.warn("[x402] Discovery fetch failed; using mapped resource URL:", error);
   }
 
-  if (!discoveryItem?.resource) {
-    throw new Error(AGENT_NOT_FOUND);
-  }
+  const discoveryItem =
+    findDiscoveryItem(items, mappedUrl) ??
+    ({ resource: mappedUrl, type: "http" } satisfies DiscoveryItem);
 
   assertX402ResourceHost(discoveryItem.resource, items);
 

@@ -24,6 +24,8 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   /** Messari x402 — /details returns 403 after pay; /ath works with exact EIP-3009 */
   "messari-analyst": "https://api.messari.io/metrics/v2/assets/ath",
   "perplexity-social": "https://api.aisa.one/apis/v2/perplexity/sonar",
+  "surf-news": "https://nano.blockrun.ai/api/v1/surf/news/feed",
+  "surf-tokenomics": "https://nano.blockrun.ai/api/v1/surf/token/tokenomics",
 };
 
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */

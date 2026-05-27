@@ -10,7 +10,8 @@ export class CircleServiceError extends Error {
       | "PAYMENT_REQUIRED"
       | "NETWORK_ERROR"
       | "SETTLEMENT_FAILED"
-      | "TIMEOUT" = "SETTLEMENT_FAILED",
+      | "TIMEOUT"
+      | "NEEDS_ETH_GAS" = "SETTLEMENT_FAILED",
   ) {
     super(message);
     this.name = "CircleServiceError";

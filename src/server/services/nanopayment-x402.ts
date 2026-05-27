@@ -107,6 +107,9 @@ export function payOptionsForAgent(
   if (agentServiceId === "messari-analyst") {
     return { method: "GET", headers: { Accept: "application/json" } };
   }
+  if (agentServiceId === "surf-news" || agentServiceId === "surf-tokenomics") {
+    return { method: "GET", headers: { Accept: "application/json" } };
+  }
   return undefined;
 }
 

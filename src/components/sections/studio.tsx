@@ -24,10 +24,14 @@ export function Studio() {
   const { data: wallet } = useWallet();
   const { t, locale } = useTranslation();
 
-  const defaultPrompt =
-    activeAgent.id === "messari-analyst"
-      ? t("studio.defaultPromptMessari")
-      : t("studio.defaultPromptPerplexity");
+  const defaultPromptForAgent = (agentId: string): string => {
+    if (agentId === "messari-analyst") return t("studio.defaultPromptMessari");
+    if (agentId === "surf-news") return t("studio.defaultPromptSurf");
+    if (agentId === "surf-tokenomics") return t("studio.defaultPromptSurfTokenomics");
+    return t("studio.defaultPromptPerplexity");
+  };
+
+  const defaultPrompt = defaultPromptForAgent(activeAgent.id);
 
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [state, setState] = useState<GenState>("idle");
@@ -35,11 +39,7 @@ export function Studio() {
   const payInFlight = useRef(false);
 
   useEffect(() => {
-    setPrompt(
-      activeAgent.id === "messari-analyst"
-        ? t("studio.defaultPromptMessari")
-        : t("studio.defaultPromptPerplexity"),
-    );
+    setPrompt(defaultPromptForAgent(activeAgent.id));
   }, [activeAgent.id, t]);
 
   const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);

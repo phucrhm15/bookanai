@@ -66,6 +66,16 @@ export const en = {
       description: "Macro & political news, long X threads (~0.01 USDC/call). Prompt in English or Vietnamese.",
       category: "Search & News",
     },
+    surf: {
+      description:
+        "AI-curated crypto headlines and social intelligence from Surf (~0.001 USDC/call).",
+      category: "News Feed",
+    },
+    surfTokenomics: {
+      description:
+        "Tokenomics snapshots from Surf (~0.0019 USDC/call): supply, unlocks, and token structure.",
+      category: "Token Research",
+    },
   },
   studio: {
     badge: "Studio",
@@ -84,6 +94,9 @@ export const en = {
     defaultPromptMessari: "Analyze BTC and ETH: price, 24h volume, market cap from Messari.",
     defaultPromptPerplexity:
       "Summarize the latest global macro and political news affecting crypto markets.",
+    defaultPromptSurf: "Give me the top crypto headlines today and why they matter.",
+    defaultPromptSurfTokenomics:
+      "Analyze tokenomics for BTC, ETH, and SOL: supply structure, unlock pressure, and key risks.",
     promptEmpty: "Add a prompt first",
     promptMismatchTitle: "This agent may not match your prompt",
     paymentFailed: "Payment failed",
@@ -184,6 +197,13 @@ export const en = {
     swapOk: "Swap submitted",
     failed: "App Kit action failed",
     tx: "Tx",
+    gasRequiredTitle: "ETH needed on Base for gas",
+    gasRequiredDesc:
+      "Deposit to Gateway runs an on-chain transaction from your embedded wallet. Base charges gas in ETH (not USDC). Send ~{{recommended}} ETH on Base to {{address}}. You have {{eth}} ETH now.",
+    insufficientUsdcTitle: "Not enough USDC on-chain",
+    insufficientUsdcInline:
+      "On-chain USDC on Base: {{have}} — less than deposit amount {{want}}.",
+    onChainHint: "On-chain wallet (Base): {{usdc}} USDC · {{eth}} ETH for gas",
   },
   ledger: {
     depositSync: "USDC deposit · synced from on-chain wallet",
@@ -220,6 +240,10 @@ export const en = {
     messariAthDown: "{{pct}}% below ATH",
     perplexityHeader: "🌍 [MACRO NEWS]",
     perplexityEmpty: "🌍 [MACRO NEWS]\nNo search content returned.",
+    surfHeader: "🏄 [SURF CRYPTO FEED]",
+    surfEmpty: "🏄 [SURF CRYPTO FEED]\nNo curated feed content returned.",
+    surfTokenomicsHeader: "🧬 [SURF TOKENOMICS]",
+    surfTokenomicsEmpty: "🧬 [SURF TOKENOMICS]\nNo tokenomics data returned.",
     responseEmpty: "Empty response.",
   },
   hints: {

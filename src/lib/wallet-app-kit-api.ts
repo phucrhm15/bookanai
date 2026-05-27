@@ -11,12 +11,30 @@ export type AppKitBalances = {
   perChain: { chain: string; amount: string }[];
 };
 
+export type AppKitFunding = {
+  address: string;
+  ethOnBase: number;
+  ethSufficient: boolean;
+  recommendedEth: number;
+  usdcOnBase: number;
+  usdcOnArc: number;
+};
+
 export async function fetchAppKitMeta(): Promise<AppKitMeta> {
   const res = await apiFetch("/api/wallet/app-kit");
   if (!res.ok) {
     throw new Error("Could not load App Kit settings");
   }
   return res.json() as Promise<AppKitMeta>;
+}
+
+export async function fetchAppKitFunding(): Promise<AppKitFunding> {
+  const res = await apiFetch("/api/wallet/app-kit?op=funding");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? "Funding status failed");
+  }
+  return res.json() as Promise<AppKitFunding>;
 }
 
 export async function fetchAppKitBalances(): Promise<AppKitBalances> {
@@ -48,7 +66,10 @@ export async function postAppKitAction(body: Record<string, string>): Promise<{
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error ?? "App Kit action failed");
+    const err = data as { error?: string; code?: string };
+    const e = new Error(err.error ?? "App Kit action failed") as Error & { code?: string };
+    e.code = err.code;
+    throw e;
   }
   return data as { state: string; txHash?: string };
 }

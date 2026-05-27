@@ -4,11 +4,19 @@
  */
 import { createRequire } from "node:module";
 import {
+  ARC_CHAIN_ID,
+  BASE_CHAIN_ID,
   type SupportedChainId,
   unifiedBalanceChainForChainId,
   UB_CHAIN_ARC,
   UB_CHAIN_BASE,
 } from "@/lib/chains";
+import {
+  chainNeedsEthForGas,
+  getEthBalanceOnBase,
+  MIN_BASE_ETH_FOR_GAS,
+  RECOMMENDED_BASE_ETH,
+} from "@/server/services/wallet-gas-check";
 import { isLiveCircleApiKey } from "@/lib/circle-dcw-blockchains";
 import { getServerEnv, isCircleConfigured } from "@/server/config/env";
 import { userStore } from "@/server/storage/user-store";
@@ -123,6 +131,87 @@ function formatKitError(error: unknown): string {
   return String(error);
 }
 
+function isGasErrorMessage(message: string): boolean {
+  return /Insufficient ETH|insufficient funds for gas|gas fees|max fee per gas/i.test(
+    message,
+  );
+}
+
+function toCircleKitError(error: unknown, prefix: string): CircleServiceError {
+  const detail = formatKitError(error);
+  const message = `${prefix}: ${detail}`;
+  if (isGasErrorMessage(detail)) {
+    return new CircleServiceError(message, "NEEDS_ETH_GAS");
+  }
+  return new CircleServiceError(message, "SETTLEMENT_FAILED");
+}
+
+export type AppKitFundingStatus = {
+  address: string;
+  ethOnBase: number;
+  ethSufficient: boolean;
+  recommendedEth: number;
+  usdcOnBase: number;
+  usdcOnArc: number;
+};
+
+export async function appKitGetFundingStatus(clerkId: string): Promise<AppKitFundingStatus> {
+  const row = await requireUserWallet(clerkId);
+  const unified = await getUnifiedBalance(row.circleWalletId);
+  const ethOnBase = await getEthBalanceOnBase(row.address as `0x${string}`);
+  const usdcOnBase = Number(
+    unified.breakdown.find((b) => b.chainId === BASE_CHAIN_ID)?.confirmedBalance ?? 0,
+  );
+  const usdcOnArc = Number(
+    unified.breakdown.find((b) => b.chainId === ARC_CHAIN_ID)?.confirmedBalance ?? 0,
+  );
+  return {
+    address: row.address,
+    ethOnBase,
+    ethSufficient: ethOnBase >= MIN_BASE_ETH_FOR_GAS,
+    recommendedEth: RECOMMENDED_BASE_ETH,
+    usdcOnBase,
+    usdcOnArc,
+  };
+}
+
+async function assertOnChainPreflight(params: {
+  chain: AppKitChainId;
+  address: string;
+  circleWalletId: string;
+  amountUsdc: number;
+}): Promise<void> {
+  const unified = await getUnifiedBalance(params.circleWalletId);
+  const onChainForChain =
+    params.chain === UB_CHAIN_BASE
+      ? Number(
+          unified.breakdown.find((b) => b.chainId === BASE_CHAIN_ID)?.confirmedBalance ?? 0,
+        )
+      : params.chain === UB_CHAIN_ARC
+        ? Number(
+            unified.breakdown.find((b) => b.chainId === ARC_CHAIN_ID)?.confirmedBalance ?? 0,
+          )
+        : unified.totalUsdc;
+
+  if (params.amountUsdc > onChainForChain + 0.000_001) {
+    throw new CircleServiceError(
+      `Insufficient USDC on ${params.chain}: need ${params.amountUsdc}, wallet has ${onChainForChain.toFixed(6)} on-chain.`,
+      "INSUFFICIENT_BALANCE",
+    );
+  }
+
+  if (chainNeedsEthForGas(params.chain)) {
+    const eth = await getEthBalanceOnBase(params.address as `0x${string}`);
+    if (eth < MIN_BASE_ETH_FOR_GAS) {
+      throw new CircleServiceError(
+        `Your embedded wallet needs ETH on Base for gas (~${RECOMMENDED_BASE_ETH} ETH recommended). ` +
+          `Send ETH to ${params.address} on Base mainnet. Current: ${eth.toFixed(6)} ETH.`,
+        "NEEDS_ETH_GAS",
+      );
+    }
+  }
+}
+
 export async function appKitGetSupportedChains(
   operation: "bridge" | "swap" | "unifiedBalance",
 ): Promise<string[]> {
@@ -165,6 +254,17 @@ export async function appKitDeposit(params: {
   const env = getServerEnv();
   const chain =
     params.chain ?? defaultUnifiedChainForApiKey(env.CIRCLE_API_KEY);
+  const amountUsdc = Number(params.amount);
+  if (!Number.isFinite(amountUsdc) || amountUsdc <= 0) {
+    throw new CircleServiceError("Invalid deposit amount", "SETTLEMENT_FAILED");
+  }
+
+  await assertOnChainPreflight({
+    chain,
+    address: row.address,
+    circleWalletId: row.circleWalletId,
+    amountUsdc,
+  });
 
   try {
     const result = await kit.unifiedBalance.deposit({
@@ -187,10 +287,7 @@ export async function appKitDeposit(params: {
       txHash: result.txHash ?? result.transactionHash,
     };
   } catch (error) {
-    throw new CircleServiceError(
-      `App Kit deposit failed: ${formatKitError(error)}`,
-      "SETTLEMENT_FAILED",
-    );
+    throw toCircleKitError(error, "App Kit deposit failed");
   }
 }
 
@@ -203,6 +300,17 @@ export async function appKitBridge(params: {
   const row = await requireUserWallet(params.clerkId);
   const adapter = getCircleAdapter();
   const kit = getKit();
+  const amountUsdc = Number(params.amount);
+  if (!Number.isFinite(amountUsdc) || amountUsdc <= 0) {
+    throw new CircleServiceError("Invalid bridge amount", "SETTLEMENT_FAILED");
+  }
+
+  await assertOnChainPreflight({
+    chain: params.fromChain,
+    address: row.address,
+    circleWalletId: row.circleWalletId,
+    amountUsdc,
+  });
 
   try {
     const result = await kit.bridge({
@@ -212,10 +320,7 @@ export async function appKitBridge(params: {
     });
     return { state: result.state ?? "submitted" };
   } catch (error) {
-    throw new CircleServiceError(
-      `App Kit bridge failed: ${formatKitError(error)}`,
-      "SETTLEMENT_FAILED",
-    );
+    throw toCircleKitError(error, "App Kit bridge failed");
   }
 }
 

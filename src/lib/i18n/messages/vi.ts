@@ -69,6 +69,16 @@ export const vi: typeof en = {
         "Tin vĩ mô, chính trị, thread X dài (~0.01 USDC/lần). Prompt tiếng Việt hoặc Anh.",
       category: "Tìm kiếm & Tin tức",
     },
+    surf: {
+      description:
+        "Tin crypto tuyển chọn bằng AI và social intelligence từ Surf (~0.001 USDC/lần).",
+      category: "Bản tin nhanh",
+    },
+    surfTokenomics: {
+      description:
+        "Phân tích tokenomics từ Surf (~0.0019 USDC/lần): cung, unlock và cấu trúc token.",
+      category: "Nghiên cứu token",
+    },
   },
   studio: {
     badge: "Studio",
@@ -87,6 +97,9 @@ export const vi: typeof en = {
     defaultPromptMessari: "Phân tích BTC và ETH: giá, volume 24h, market cap từ Messari.",
     defaultPromptPerplexity:
       "Tóm tắt tin vĩ mô và chính trị toàn cầu mới nhất ảnh hưởng đến thị trường crypto.",
+    defaultPromptSurf: "Cho tôi các headline crypto nổi bật hôm nay và vì sao quan trọng.",
+    defaultPromptSurfTokenomics:
+      "Phân tích tokenomics BTC, ETH, SOL: cấu trúc nguồn cung, áp lực unlock và rủi ro chính.",
     promptEmpty: "Nhập prompt trước",
     promptMismatchTitle: "Agent có thể không phù hợp prompt",
     paymentFailed: "Thanh toán thất bại",
@@ -188,6 +201,13 @@ export const vi: typeof en = {
     swapOk: "Đã gửi lệnh swap",
     failed: "Thao tác App Kit thất bại",
     tx: "Tx",
+    gasRequiredTitle: "Cần ETH trên Base để trả gas",
+    gasRequiredDesc:
+      "Nạp Gateway là giao dịch on-chain từ ví embedded. Base tính phí gas bằng ETH (không phải USDC). Gửi ~{{recommended}} ETH trên Base tới {{address}}. Hiện có {{eth}} ETH.",
+    insufficientUsdcTitle: "Không đủ USDC on-chain",
+    insufficientUsdcInline:
+      "USDC on-chain trên Base: {{have}} — ít hơn số nạp {{want}}.",
+    onChainHint: "Ví on-chain (Base): {{usdc}} USDC · {{eth}} ETH cho gas",
   },
   ledger: {
     depositSync: "Nạp USDC · đồng bộ từ ví on-chain",
@@ -224,6 +244,10 @@ export const vi: typeof en = {
     messariAthDown: "{{pct}}% dưới ATH",
     perplexityHeader: "🌍 [TIN TỨC VĨ MÔ]",
     perplexityEmpty: "🌍 [TIN TỨC VĨ MÔ]\nKhông có nội dung tìm kiếm.",
+    surfHeader: "🏄 [BẢN TIN SURF CRYPTO]",
+    surfEmpty: "🏄 [BẢN TIN SURF CRYPTO]\nKhông có nội dung feed trả về.",
+    surfTokenomicsHeader: "🧬 [SURF TOKENOMICS]",
+    surfTokenomicsEmpty: "🧬 [SURF TOKENOMICS]\nKhông có dữ liệu tokenomics trả về.",
     responseEmpty: "Phản hồi trống.",
   },
   hints: {

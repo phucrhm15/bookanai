@@ -19,6 +19,7 @@ import { Route as AppStudioRouteImport } from './routes/_app.studio'
 import { Route as AppMarketplaceRouteImport } from './routes/_app.marketplace'
 import { Route as ApiWalletIndexRouteImport } from './routes/api/wallet/index'
 import { Route as ApiWalletNanopaymentRouteImport } from './routes/api/wallet/nanopayment'
+import { Route as ApiWalletAppKitRouteImport } from './routes/api/wallet/app-kit'
 import { Route as ApiMasterStatusRouteImport } from './routes/api/master/status'
 import { Route as ApiCronSettleBatchRouteImport } from './routes/api/cron/settle-batch'
 
@@ -71,6 +72,11 @@ const ApiWalletNanopaymentRoute = ApiWalletNanopaymentRouteImport.update({
   path: '/api/wallet/nanopayment',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWalletAppKitRoute = ApiWalletAppKitRouteImport.update({
+  id: '/api/wallet/app-kit',
+  path: '/api/wallet/app-kit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMasterStatusRoute = ApiMasterStatusRouteImport.update({
   id: '/api/master/status',
   path: '/api/master/status',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/sign-up/$': typeof SignUpSplatRoute
   '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
   '/api/master/status': typeof ApiMasterStatusRoute
+  '/api/wallet/app-kit': typeof ApiWalletAppKitRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
   '/api/wallet/': typeof ApiWalletIndexRoute
 }
@@ -105,6 +112,7 @@ export interface FileRoutesByTo {
   '/sign-up/$': typeof SignUpSplatRoute
   '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
   '/api/master/status': typeof ApiMasterStatusRoute
+  '/api/wallet/app-kit': typeof ApiWalletAppKitRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
   '/api/wallet': typeof ApiWalletIndexRoute
 }
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   '/sign-up/$': typeof SignUpSplatRoute
   '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
   '/api/master/status': typeof ApiMasterStatusRoute
+  '/api/wallet/app-kit': typeof ApiWalletAppKitRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
   '/api/wallet/': typeof ApiWalletIndexRoute
 }
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/api/cron/settle-batch'
     | '/api/master/status'
+    | '/api/wallet/app-kit'
     | '/api/wallet/nanopayment'
     | '/api/wallet/'
   fileRoutesByTo: FileRoutesByTo
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/api/cron/settle-batch'
     | '/api/master/status'
+    | '/api/wallet/app-kit'
     | '/api/wallet/nanopayment'
     | '/api/wallet'
   id:
@@ -162,6 +173,7 @@ export interface FileRouteTypes {
     | '/sign-up/$'
     | '/api/cron/settle-batch'
     | '/api/master/status'
+    | '/api/wallet/app-kit'
     | '/api/wallet/nanopayment'
     | '/api/wallet/'
   fileRoutesById: FileRoutesById
@@ -174,6 +186,7 @@ export interface RootRouteChildren {
   SignUpSplatRoute: typeof SignUpSplatRoute
   ApiCronSettleBatchRoute: typeof ApiCronSettleBatchRoute
   ApiMasterStatusRoute: typeof ApiMasterStatusRoute
+  ApiWalletAppKitRoute: typeof ApiWalletAppKitRoute
   ApiWalletNanopaymentRoute: typeof ApiWalletNanopaymentRoute
   ApiWalletIndexRoute: typeof ApiWalletIndexRoute
 }
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWalletNanopaymentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/wallet/app-kit': {
+      id: '/api/wallet/app-kit'
+      path: '/api/wallet/app-kit'
+      fullPath: '/api/wallet/app-kit'
+      preLoaderRoute: typeof ApiWalletAppKitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/master/status': {
       id: '/api/master/status'
       path: '/api/master/status'
@@ -289,6 +309,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignUpSplatRoute: SignUpSplatRoute,
   ApiCronSettleBatchRoute: ApiCronSettleBatchRoute,
   ApiMasterStatusRoute: ApiMasterStatusRoute,
+  ApiWalletAppKitRoute: ApiWalletAppKitRoute,
   ApiWalletNanopaymentRoute: ApiWalletNanopaymentRoute,
   ApiWalletIndexRoute: ApiWalletIndexRoute,
 }

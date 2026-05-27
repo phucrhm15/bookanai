@@ -9,6 +9,7 @@ import {
   appKitBridge,
   appKitDeposit,
   appKitGetBalances,
+  appKitGetFundingStatus,
   appKitGetSupportedChains,
   appKitSpend,
   appKitSwap,
@@ -58,6 +59,11 @@ export const Route = createFileRoute("/api/wallet/app-kit")({
           if (op === "balances") {
             const balances = await appKitGetBalances(clerkId);
             return Response.json(balances);
+          }
+
+          if (op === "funding") {
+            const funding = await appKitGetFundingStatus(clerkId);
+            return Response.json(funding);
           }
 
           if (op === "chains") {

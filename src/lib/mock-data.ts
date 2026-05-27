@@ -36,6 +36,30 @@ export const AGENTS: Agent[] = [
     accent: "magenta",
     baseUrl: "https://api.aisa.one",
   },
+  {
+    id: "surf-news",
+    name: "Surf Crypto News",
+    handle: "@surf_ai",
+    category: "News Feed",
+    price: 0.001,
+    description:
+      "AI-curated crypto news feed from Surf (~0.001 USDC/call). Great for fast market headlines.",
+    emoji: "🏄",
+    accent: "cyan",
+    baseUrl: "https://nano.blockrun.ai",
+  },
+  {
+    id: "surf-tokenomics",
+    name: "Surf Tokenomics",
+    handle: "@surf_tokenomics",
+    category: "Token Research",
+    price: 0.0019,
+    description:
+      "Tokenomics-focused endpoint from Surf (~0.0019 USDC/call): supply, unlock, and structure snapshots.",
+    emoji: "🧬",
+    accent: "magenta",
+    baseUrl: "https://nano.blockrun.ai",
+  },
 ];
 
 export type Transaction = {

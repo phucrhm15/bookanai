@@ -2,9 +2,14 @@ import { AGENTS, type Agent } from "@/lib/mock-data";
 import { translate } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/types";
 
-const AGENT_I18N_KEYS: Record<string, "messari" | "perplexity"> = {
+const AGENT_I18N_KEYS: Record<
+  string,
+  "messari" | "perplexity" | "surf" | "surfTokenomics"
+> = {
   "messari-analyst": "messari",
   "perplexity-social": "perplexity",
+  "surf-news": "surf",
+  "surf-tokenomics": "surfTokenomics",
 };
 
 /** Agents with locale-specific description & category (names stay English). */

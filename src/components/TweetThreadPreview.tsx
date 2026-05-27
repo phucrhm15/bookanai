@@ -214,6 +214,41 @@ function formatPerplexityData(data: unknown, t: TFn): string {
   return `${header}\n${JSON.stringify(root, null, 2).slice(0, 2000)}`;
 }
 
+/** Format Surf feed/tokenomics payloads into short postable bullets. */
+function formatSurfData(data: unknown, t: TFn, tokenomics = false): string {
+  const header = tokenomics ? t("thread.surfTokenomicsHeader") : t("thread.surfHeader");
+  const empty = tokenomics ? t("thread.surfTokenomicsEmpty") : t("thread.surfEmpty");
+  const root = asRecord(data);
+  if (!root) {
+    return typeof data === "string" ? `${header}\n${data}` : empty;
+  }
+
+  const direct =
+    pickString(root, ["text", "content", "message", "summary", "result"]) ??
+    (typeof root.data === "string" ? root.data : undefined);
+  if (direct) return `${header}\n${direct}`;
+
+  const listCandidate = root.data ?? root.items ?? root.results ?? root.news ?? root.feed;
+  if (Array.isArray(listCandidate)) {
+    const lines = listCandidate
+      .slice(0, 8)
+      .map((item) => asRecord(item))
+      .filter((item): item is JsonRecord => Boolean(item))
+      .map((item) => {
+        const title = pickString(item, ["title", "headline", "name", "text"]);
+        const desc = pickString(item, ["summary", "description", "snippet"]);
+        const source = pickString(item, ["source", "domain", "publisher"]);
+        const lead = title ? `• ${title}` : "• Update";
+        const detail = desc ? `\n  ${desc}` : "";
+        const from = source ? `\n  (${source})` : "";
+        return `${lead}${detail}${from}`;
+      });
+    if (lines.length) return `${header}\n${lines.join("\n")}`;
+  }
+
+  return `${header}\n${JSON.stringify(root, null, 2).slice(0, 2000)}`;
+}
+
 /**
  * Parse raw x402 API JSON by agent and return a single formatted string
  * (before thread splitting).
@@ -223,13 +258,19 @@ export function parseAgentData(agentId: string, rawResponse: string, t: TFn): st
   if (!trimmed) {
     return agentId === "messari-analyst"
       ? `${t("thread.messariHeader")}\n${t("thread.responseEmpty")}`
-      : `${t("thread.perplexityHeader")}\n${t("thread.responseEmpty")}`;
+      : agentId === "surf-news"
+        ? `${t("thread.surfHeader")}\n${t("thread.responseEmpty")}`
+        : agentId === "surf-tokenomics"
+          ? `${t("thread.surfTokenomicsHeader")}\n${t("thread.responseEmpty")}`
+        : `${t("thread.perplexityHeader")}\n${t("thread.responseEmpty")}`;
   }
 
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (agentId === "messari-analyst") return formatMessariData(parsed, t);
     if (agentId === "perplexity-social") return formatPerplexityData(parsed, t);
+    if (agentId === "surf-news") return formatSurfData(parsed, t);
+    if (agentId === "surf-tokenomics") return formatSurfData(parsed, t, true);
     if (typeof parsed === "string") return parsed;
     return JSON.stringify(parsed, null, 2);
   } catch {

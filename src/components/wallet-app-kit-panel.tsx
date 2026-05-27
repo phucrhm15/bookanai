@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeftRight, Coins, Loader2, Send, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, Coins, Loader2, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import { useTranslation } from "@/lib/i18n/locale-context";
 import {
   fetchAppKitBalances,
   fetchAppKitChains,
+  fetchAppKitFunding,
   fetchAppKitMeta,
   postAppKitAction,
 } from "@/lib/wallet-app-kit-api";
@@ -61,6 +62,12 @@ export function WalletAppKitPanel({ walletAddress, defaultChain }: WalletAppKitP
     refetchInterval: 30_000,
   });
 
+  const fundingQuery = useQuery({
+    queryKey: ["app-kit-funding"],
+    queryFn: fetchAppKitFunding,
+    refetchInterval: 30_000,
+  });
+
   const bridgeChainsQuery = useQuery({
     queryKey: ["app-kit-chains-bridge"],
     queryFn: () => fetchAppKitChains("bridge"),
@@ -92,9 +99,22 @@ export function WalletAppKitPanel({ walletAddress, defaultChain }: WalletAppKitP
       });
       invalidateWallet();
     } catch (err) {
-      toast.error(t("appKit.failed"), {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      const code = (err as Error & { code?: string }).code;
+      const description = err instanceof Error ? err.message : String(err);
+      if (code === "NEEDS_ETH_GAS") {
+        toast.error(t("appKit.gasRequiredTitle"), {
+          description: t("appKit.gasRequiredDesc", {
+            address: walletAddress,
+            eth: fundingQuery.data?.ethOnBase.toFixed(6) ?? "0",
+            recommended: String(fundingQuery.data?.recommendedEth ?? 0.001),
+          }),
+          duration: 12_000,
+        });
+      } else if (code === "INSUFFICIENT_BALANCE") {
+        toast.error(t("appKit.insufficientUsdcTitle"), { description });
+      } else {
+        toast.error(t("appKit.failed"), { description });
+      }
     } finally {
       setBusy(false);
     }
@@ -157,7 +177,39 @@ export function WalletAppKitPanel({ walletAddress, defaultChain }: WalletAppKitP
         </TabsList>
 
         <TabsContent value="deposit" className="mt-4 space-y-3">
+          {fundingQuery.data && !fundingQuery.data.ethSufficient && depositChain === "Base" ? (
+            <div className="flex gap-2 rounded-md border border-magenta/40 bg-magenta/10 p-3 text-xs leading-relaxed">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-magenta" />
+              <div>
+                <p className="font-semibold text-magenta">{t("appKit.gasRequiredTitle")}</p>
+                <p className="mt-1 text-foreground">{t("appKit.gasRequiredDesc", {
+                  address: walletAddress,
+                  eth: fundingQuery.data.ethOnBase.toFixed(6),
+                  recommended: String(fundingQuery.data.recommendedEth),
+                })}</p>
+                <p className="mt-2 font-mono text-[10px] text-muted-foreground break-all">
+                  {walletAddress}
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {fundingQuery.data && depositAmount && Number(depositAmount) > fundingQuery.data.usdcOnBase + 0.000001 ? (
+            <p className="text-xs text-magenta">
+              {t("appKit.insufficientUsdcInline", {
+                have: fundingQuery.data.usdcOnBase.toFixed(4),
+                want: depositAmount,
+              })}
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">{t("appKit.depositHelp")}</p>
+          {fundingQuery.data ? (
+            <p className="font-mono text-[10px] text-muted-foreground">
+              {t("appKit.onChainHint", {
+                usdc: fundingQuery.data.usdcOnBase.toFixed(4),
+                eth: fundingQuery.data.ethOnBase.toFixed(6),
+              })}
+            </p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-xs">{t("appKit.amount")}</Label>

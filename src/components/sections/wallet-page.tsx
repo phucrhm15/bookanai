@@ -30,6 +30,8 @@ import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import { formatLedgerLabel } from "@/lib/ledger-labels";
 import type { Locale } from "@/lib/i18n/types";
+import { WalletAppKitPanel } from "@/components/wallet-app-kit-panel";
+import { BASE_CHAIN_ID, UB_CHAIN_ARC, UB_CHAIN_BASE } from "@/lib/chains";
 
 export function WalletPage() {
   const { t, locale } = useTranslation();
@@ -41,6 +43,8 @@ export function WalletPage() {
   const baseNetwork = data?.networks?.base ?? BASE_NETWORK;
   const arcNetwork = data?.networks?.arc ?? ARC_NETWORK;
   const usdcContract = arcNetwork.usdcContractAddress ?? data?.usdcContractAddress ?? "0x3600000000000000000000000000000000000000";
+  const appKitDefaultChain =
+    (data?.preferredChainId ?? BASE_CHAIN_ID) === BASE_CHAIN_ID ? UB_CHAIN_BASE : UB_CHAIN_ARC;
   const shortAddress = address
     ? `${address.slice(0, 5)}…${address.slice(-3)}`
     : "…";
@@ -77,6 +81,12 @@ export function WalletPage() {
         />
         <TransactionHistory t={t} locale={locale} transactions={data?.transactions ?? []} />
       </div>
+
+      {address ? (
+        <div className="mt-6">
+          <WalletAppKitPanel walletAddress={address} defaultChain={appKitDefaultChain} />
+        </div>
+      ) : null}
     </div>
   );
 }

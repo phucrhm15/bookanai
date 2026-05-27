@@ -9,6 +9,7 @@
 - Ví embedded **Circle** mỗi user
 - Thanh toán **x402** (giá động từ HTTP 402)
 - Ledger SQLite (lịch sử giao dịch)
+- **Circle App Kit** — Gateway deposit, bridge, withdraw, swap (`@circle-fin/app-kit` + DCW adapter)
 
 ## Yêu cầu (người vận hành server)
 
@@ -17,6 +18,7 @@
 | [Clerk](https://clerk.com) | Đăng ký / đăng nhập user |
 | [Circle](https://developers.circle.com) | API key, entity secret, wallet set |
 | Ví **Master** (`MASTER_AGENT_PRIVATE_KEY`) | Trả API x402 cho mọi user — **phải có USDC + ETH gas trên Base** |
+| `CIRCLE_KIT_KEY` (tùy chọn) | Bật **Swap** trong App Kit trên trang Wallet |
 | RPC Base | `BASE_RPC_URL` |
 
 ## Cài đặt local (dev)

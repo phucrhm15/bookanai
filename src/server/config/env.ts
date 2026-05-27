@@ -20,6 +20,11 @@ const envSchema = z.object({
     .url()
     .default("https://api.circle.com/v2/x402/discovery/resources"),
   SETTLEMENT_CRON_SECRET: z.string().min(16).optional(),
+  /** Optional — enables App Kit swap (format KIT_KEY:id:secret). Bridge/deposit/unified balance do not require it. */
+  CIRCLE_KIT_KEY: z
+    .string()
+    .regex(/^KIT_KEY:/, "CIRCLE_KIT_KEY must start with KIT_KEY:")
+    .optional(),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

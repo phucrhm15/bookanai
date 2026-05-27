@@ -28,8 +28,35 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   "surf-tokenomics": "https://nano.blockrun.ai/api/v1/surf/token/tokenomics",
 };
 
+/** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
+export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> = {
+  "surf-news": 0.001,
+  "surf-tokenomics": 0.0019,
+};
+
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
-const DIRECT_X402_HOSTS = new Set(["api.messari.io"]);
+const DIRECT_X402_HOSTS = new Set(["api.messari.io", "nano.blockrun.ai"]);
+
+/** All HTTPS hosts from STUDIO_AGENT_RESOURCES (+ DIRECT_X402_HOSTS). */
+function studioAllowlistedHosts(): Set<string> {
+  const hosts = new Set(DIRECT_X402_HOSTS);
+  for (const url of Object.values(STUDIO_AGENT_RESOURCES)) {
+    try {
+      hosts.add(new URL(url).hostname.toLowerCase());
+    } catch {
+      // skip malformed entries
+    }
+  }
+  return hosts;
+}
+
+function isDirectX402MappedUrl(resourceUrl: string): boolean {
+  try {
+    return studioAllowlistedHosts().has(new URL(resourceUrl).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 export type ResolvedAgentResource = {
   resourceUrl: string;
@@ -79,7 +106,7 @@ function assertX402ResourceHost(
   const host = parsed.hostname.toLowerCase();
   const catalogHosts = discoveryCatalogHosts(catalogItems);
 
-  if (catalogHosts.has(host) || DIRECT_X402_HOSTS.has(host)) {
+  if (catalogHosts.has(host) || studioAllowlistedHosts().has(host)) {
     return;
   }
 
@@ -129,9 +156,29 @@ function findDiscoveryItem(
   items: DiscoveryItem[],
   resourceUrl: string,
 ): DiscoveryItem | undefined {
-  return items.find(
+  const exact = items.find(
     (item) => item.type === "http" && item.resource === resourceUrl,
   );
+  if (exact) return exact;
+
+  try {
+    const target = new URL(resourceUrl);
+    const path = target.pathname.replace(/\/$/, "");
+    return items.find((item) => {
+      if (item.type !== "http" || !item.resource) return false;
+      try {
+        const u = new URL(item.resource);
+        return (
+          u.hostname.toLowerCase() === target.hostname.toLowerCase() &&
+          u.pathname.replace(/\/$/, "") === path
+        );
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -149,11 +196,8 @@ export async function resolveAgentResource(
   const items = await fetchDiscoveryResources();
   let discoveryItem = findDiscoveryItem(items, mappedUrl);
 
-  if (!discoveryItem) {
-    const host = new URL(mappedUrl).hostname.toLowerCase();
-    if (DIRECT_X402_HOSTS.has(host)) {
-      discoveryItem = { resource: mappedUrl, type: "http" };
-    }
+  if (!discoveryItem && isDirectX402MappedUrl(mappedUrl)) {
+    discoveryItem = { resource: mappedUrl, type: "http" };
   }
 
   if (!discoveryItem?.resource) {

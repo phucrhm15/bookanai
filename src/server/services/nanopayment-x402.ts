@@ -23,7 +23,10 @@ import {
   type NanopaymentResult,
 } from "@/services/circleService";
 import { CircleServiceError } from "@/services/circle-errors";
-import { resolveAgentResource } from "@/services/agent-service-map";
+import {
+  resolveAgentResource,
+  STUDIO_AGENT_FALLBACK_PRICE_USDC,
+} from "@/services/agent-service-map";
 import {
   activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
@@ -158,11 +161,22 @@ export async function processNanopaymentX402(
   const resourceUrl = withAgentResourceQuery(agentServiceId, mappedUrl, prompt);
   console.info(`[x402] Discovery resource for ${agentServiceId}: ${resourceUrl}`);
 
-  const probe = await probeX402ResourcePrice(
-    mappedUrl,
-    targetChainId,
-    discoveryItem.accepts,
-  );
+  let probe;
+  try {
+    probe = await probeX402ResourcePrice(
+      mappedUrl,
+      targetChainId,
+      discoveryItem.accepts,
+    );
+  } catch (probeError) {
+    const fallback = STUDIO_AGENT_FALLBACK_PRICE_USDC[agentServiceId];
+    if (fallback == null) throw probeError;
+    console.warn(
+      `[x402] Probe fallback for ${agentServiceId}: ${fallback} USDC`,
+      probeError,
+    );
+    probe = { status: 402, paymentRequired: true, priceUsdc: fallback };
+  }
   const agentPriceUsdc = probe.priceUsdc;
   console.info(`[x402] Dynamic agent price: ${agentPriceUsdc} USDC (HTTP ${probe.status})`);
 

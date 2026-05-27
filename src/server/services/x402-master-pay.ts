@@ -52,6 +52,37 @@ function rpcUrlForChain(chainId: number): string | undefined {
   return undefined;
 }
 
+type GatewayChainKey = "base" | "polygon" | "arcTestnet";
+
+function rpcUrlForGatewayChain(chain: GatewayChainKey): string {
+  if (chain === "polygon") return polygonRpcCandidates()[0];
+  if (chain === "base") return rpcUrlCandidates()[0];
+  return process.env.ARC_RPC_URL?.trim() ?? "https://rpc.testnet.arc.network";
+}
+
+async function resolveGatewayChainForResource(
+  resourceUrl: string,
+  privateKey: `0x${string}`,
+): Promise<GatewayChainKey | null> {
+  // Surf / nano.blockrun require GatewayWalletBatched on Polygon — try polygon before base.
+  const order: GatewayChainKey[] = ["polygon", "base", "arcTestnet"];
+  for (const chain of order) {
+    const gateway = new GatewayClient({
+      chain,
+      privateKey,
+      rpcUrl: rpcUrlForGatewayChain(chain),
+    });
+    const support = await gateway.supports(resourceUrl).catch(() => ({
+      supported: false as const,
+    }));
+    if (support.supported) {
+      console.info(`[x402] Gateway batching on ${chain} for ${resourceUrl}`);
+      return chain;
+    }
+  }
+  return null;
+}
+
 function parseResponseBody(text: string): unknown {
   const trimmed = text.trim();
   if (!trimmed) return "";
@@ -95,21 +126,24 @@ function parsePaymentRequiredAcceptsFromHeader(response: Response): PaymentRequi
 
 async function ensureGatewayLiquidity(
   gateway: GatewayClient,
+  gatewayChain: GatewayChainKey,
   minUsdc: number,
 ): Promise<void> {
   const balances = await gateway.getBalances();
   const depositor = masterDepositorAddress();
+  const rpcUrls =
+    gatewayChain === "polygon" ? polygonRpcCandidates() : rpcUrlCandidates();
   const snapshot = await getGatewayLiquiditySnapshot(
     depositor,
     balances.gateway.formattedAvailable,
-    rpcUrlCandidates(),
+    rpcUrls,
   );
 
   if (snapshot.effectiveAvailable < minUsdc) {
     throw new CircleServiceError(
-      `Circle Gateway thiếu USDC: API ${snapshot.apiAvailable.toFixed(6)}, on-chain ${snapshot.onChainAvailable.toFixed(6)}, cần ~${minUsdc}. ` +
+      `Circle Gateway thiếu USDC (${gatewayChain}): API ${snapshot.apiAvailable.toFixed(6)}, on-chain ${snapshot.onChainAvailable.toFixed(6)}, cần ~${minUsdc}. ` +
         `Ví Master EOA: ${balances.wallet.formatted} USDC (${depositor}). ` +
-        `Chạy: npm run gateway:deposit -- ${Math.max(minUsdc, 0.15)} rồi npm run gateway:status`,
+        `Surf cần Gateway trên Polygon — nạp USDC + MATIC gas cho master, hoặc npm run gateway:deposit trên đúng chain.`,
       "INSUFFICIENT_BALANCE",
     );
   }
@@ -123,11 +157,12 @@ async function ensureGatewayLiquidity(
 
 async function payViaGateway(
   gateway: GatewayClient,
+  gatewayChain: GatewayChainKey,
   resourceUrl: string,
   minUsdc: number,
   init?: X402PayRequestInit,
 ): Promise<X402PayResult> {
-  await ensureGatewayLiquidity(gateway, minUsdc);
+  await ensureGatewayLiquidity(gateway, gatewayChain, minUsdc);
   const result = await gateway.pay(resourceUrl, {
     method: init?.method ?? "GET",
     headers: init?.headers,
@@ -232,19 +267,17 @@ export async function payX402Resource(
   init?: X402PayRequestInit,
 ): Promise<X402PayResult> {
   const env = getServerEnv();
-  const gateway = new GatewayClient({
-    chain: gatewayChainKeyForChainId(chainId),
-    privateKey: env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`,
-    rpcUrl: env.BASE_RPC_URL,
-  });
+  const privateKey = env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`;
 
-  const support = await gateway.supports(resourceUrl).catch(() => ({
-    supported: false as const,
-  }));
-
-  if (support.supported) {
+  const gatewayChain = await resolveGatewayChainForResource(resourceUrl, privateKey);
+  if (gatewayChain) {
+    const gateway = new GatewayClient({
+      chain: gatewayChain,
+      privateKey,
+      rpcUrl: rpcUrlForGatewayChain(gatewayChain),
+    });
     try {
-      return await payViaGateway(gateway, resourceUrl, minUsdc, init);
+      return await payViaGateway(gateway, gatewayChain, resourceUrl, minUsdc, init);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (
@@ -255,6 +288,25 @@ export async function payX402Resource(
       }
       throw error;
     }
+  }
+
+  // Messari and other exact EIP-3009 sellers (not GatewayWalletBatched).
+  const legacyGateway = new GatewayClient({
+    chain: gatewayChainKeyForChainId(chainId),
+    privateKey,
+    rpcUrl: env.BASE_RPC_URL,
+  });
+  const legacySupport = await legacyGateway.supports(resourceUrl).catch(() => ({
+    supported: false as const,
+  }));
+  if (legacySupport.supported) {
+    return payViaGateway(
+      legacyGateway,
+      gatewayChainKeyForChainId(chainId),
+      resourceUrl,
+      minUsdc,
+      init,
+    );
   }
 
   return payViaExactEvm(resourceUrl, chainId, minUsdc, init);

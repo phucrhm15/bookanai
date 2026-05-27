@@ -9,6 +9,8 @@ const GAS_RE =
   /native token|insufficient funds for gas|max fee per gas|gas required exceeds|ETH gas/i;
 const NETWORK_SCHEME_RE =
   /No network\/scheme registered|x402Version|paymentRequirements|eip155:137|GatewayWalletBatched/i;
+const PAYMENT_VERIFY_RE =
+  /Payment verification failed|payment verification failed/i;
 
 function spendableLooksZero(message: string): boolean {
   const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
@@ -69,6 +71,21 @@ export function formatPaymentErrorForUser(
       (addr
         ? `Admin: send ~0.001–0.002 ETH (Base) to ${addr} · npm run show:x402`
         : "Admin: npm run show:x402 — fund ETH on the printed address.")
+    );
+  }
+
+  if (PAYMENT_VERIFY_RE.test(message)) {
+    if (locale === "vi") {
+      return (
+        "Thanh toán x402 không được Surf xác minh. Surf dùng Circle Gateway trên Polygon — " +
+        "ví master (MASTER_AGENT_PRIVATE_KEY) cần USDC trong Gateway Polygon và MATIC gas. " +
+        "Chạy npm run show:x402 để xem địa chỉ master."
+      );
+    }
+    return (
+      "x402 payment was not verified by Surf. Surf uses Circle Gateway on Polygon — " +
+      "the master wallet (MASTER_AGENT_PRIVATE_KEY) needs Gateway USDC on Polygon plus MATIC for gas. " +
+      "Run npm run show:x402 for the master address."
     );
   }
 

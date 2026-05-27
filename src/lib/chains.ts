@@ -1,11 +1,17 @@
 /** Base mainnet — Circle unified balance id `Base`, DCW blockchain `BASE` */
 export const BASE_CHAIN_ID = 8453 as const;
 
+/** Polygon mainnet — Surf / nano.blockrun x402 (GatewayWalletBatched) */
+export const POLYGON_CHAIN_ID = 137 as const;
+
 /** Arc Testnet — Circle unified balance id `Arc_Testnet`, DCW blockchain `ARC-TESTNET` */
 export const ARC_CHAIN_ID = 5042002 as const;
 
 export const BASE_USDC_CONTRACT_ADDRESS =
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+
+export const POLYGON_USDC_CONTRACT_ADDRESS =
+  "0x3c499c542cEF5E3811e192ce70d8cC03d5c3359" as const;
 
 export const ARC_USDC_CONTRACT_ADDRESS =
   "0x3600000000000000000000000000000000000000" as const;

@@ -11,6 +11,8 @@ const NETWORK_SCHEME_RE =
   /No network\/scheme registered|x402Version|paymentRequirements|eip155:137|GatewayWalletBatched/i;
 const PAYMENT_VERIFY_RE =
   /Payment verification failed|payment verification failed/i;
+const RPC_AUTH_RE =
+  /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
 
 function spendableLooksZero(message: string): boolean {
   const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
@@ -71,6 +73,21 @@ export function formatPaymentErrorForUser(
       (addr
         ? `Admin: send ~0.001–0.002 ETH (Base) to ${addr} · npm run show:x402`
         : "Admin: npm run show:x402 — fund ETH on the printed address.")
+    );
+  }
+
+  if (RPC_AUTH_RE.test(message)) {
+    if (locale === "vi") {
+      return (
+        "RPC Polygon trên server bị từ chối (polygon-rpc.com cần API key). " +
+        "Admin: đặt POLYGON_RPC_URL=https://polygon.llamarpc.com trên Render, redeploy, " +
+        "và đảm bảo ví master có USDC trong Circle Gateway Polygon + MATIC gas."
+      );
+    }
+    return (
+      "Polygon RPC on the server was rejected (polygon-rpc.com requires an API key). " +
+      "Admin: set POLYGON_RPC_URL=https://polygon.llamarpc.com on Render, redeploy, " +
+      "and ensure the master wallet has Gateway USDC on Polygon plus MATIC for gas."
     );
   }
 

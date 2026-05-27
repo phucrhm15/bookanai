@@ -13,6 +13,7 @@ import {
   type SupportedChainId,
 } from "@/lib/chains";
 import { getGatewayLiquiditySnapshot } from "@/lib/gateway-onchain-balance";
+import { sanitizeRpcUrls } from "@/lib/rpc-urls";
 import { getServerEnv } from "@/server/config/env";
 import { CircleServiceError } from "@/services/circle-errors";
 
@@ -33,17 +34,22 @@ function masterDepositorAddress(): `0x${string}` {
 }
 
 function rpcUrlCandidates(): string[] {
-  const primary = getServerEnv().BASE_RPC_URL;
-  return [primary, "https://mainnet.base.org", "https://base.llamarpc.com"].filter(
-    (url, index, all) => url && all.indexOf(url) === index,
-  );
+  const env = getServerEnv();
+  return sanitizeRpcUrls([
+    env.BASE_RPC_URL,
+    "https://mainnet.base.org",
+    "https://base.llamarpc.com",
+  ]);
 }
 
 function polygonRpcCandidates(): string[] {
-  const primary = process.env.POLYGON_RPC_URL?.trim();
-  return [primary, "https://polygon-rpc.com", "https://rpc.ankr.com/polygon"].filter(
-    (url, index, all) => Boolean(url) && all.indexOf(url) === index,
-  ) as string[];
+  const env = getServerEnv();
+  return sanitizeRpcUrls([
+    env.POLYGON_RPC_URL,
+    "https://polygon.llamarpc.com",
+    "https://1rpc.io/matic",
+    "https://rpc.ankr.com/polygon",
+  ]);
 }
 
 function rpcUrlForChain(chainId: number): string | undefined {
@@ -52,12 +58,23 @@ function rpcUrlForChain(chainId: number): string | undefined {
   return undefined;
 }
 
+function requirePolygonRpc(): string {
+  const url = polygonRpcCandidates()[0];
+  if (!url) {
+    throw new CircleServiceError(
+      "POLYGON_RPC_URL is missing or blocked (polygon-rpc.com requires a paid key). Set POLYGON_RPC_URL=https://polygon.llamarpc.com",
+      "NETWORK_ERROR",
+    );
+  }
+  return url;
+}
+
 type GatewayChainKey = "base" | "polygon" | "arcTestnet";
 
 function rpcUrlForGatewayChain(chain: GatewayChainKey): string {
-  if (chain === "polygon") return polygonRpcCandidates()[0];
-  if (chain === "base") return rpcUrlCandidates()[0];
-  return process.env.ARC_RPC_URL?.trim() ?? "https://rpc.testnet.arc.network";
+  if (chain === "polygon") return requirePolygonRpc();
+  if (chain === "base") return rpcUrlCandidates()[0] ?? getServerEnv().BASE_RPC_URL;
+  return getServerEnv().ARC_RPC_URL;
 }
 
 async function resolveGatewayChainForResource(
@@ -133,10 +150,12 @@ async function ensureGatewayLiquidity(
   const depositor = masterDepositorAddress();
   const rpcUrls =
     gatewayChain === "polygon" ? polygonRpcCandidates() : rpcUrlCandidates();
+  const onChainChain = gatewayChain === "polygon" ? "polygon" : "base";
   const snapshot = await getGatewayLiquiditySnapshot(
     depositor,
     balances.gateway.formattedAvailable,
     rpcUrls,
+    onChainChain,
   );
 
   if (snapshot.effectiveAvailable < minUsdc) {

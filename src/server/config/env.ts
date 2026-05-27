@@ -8,6 +8,8 @@ const envSchema = z.object({
     .regex(/^0x[0-9a-fA-F]{64}$/, "MASTER_AGENT_PRIVATE_KEY must be a 0x-prefixed 32-byte hex key"),
   CIRCLE_WALLET_SET_ID: z.string().min(1),
   BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
+  /** Polygon mainnet — Surf x402 Gateway (do not use polygon-rpc.com without a paid key) */
+  POLYGON_RPC_URL: z.string().url().default("https://polygon.llamarpc.com"),
   ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
   BASE_CHAIN_ID: z.coerce.number().default(8453),
   ARC_CHAIN_ID: z.coerce.number().default(5042002),

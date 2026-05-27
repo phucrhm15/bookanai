@@ -1,6 +1,10 @@
 import { createPublicClient, formatUnits, http, parseAbi } from "viem";
-import { base } from "viem/chains";
-import { BASE_USDC_CONTRACT_ADDRESS } from "@/lib/chains";
+import { base, polygon } from "viem/chains";
+import {
+  BASE_USDC_CONTRACT_ADDRESS,
+  POLYGON_USDC_CONTRACT_ADDRESS,
+} from "@/lib/chains";
+import { sanitizeRpcUrls } from "@/lib/rpc-urls";
 
 /** Circle Gateway Wallet on EVM mainnets (Base domain 6). */
 export const MAINNET_GATEWAY_WALLET_ADDRESS =
@@ -10,20 +14,26 @@ const gatewayWalletAbi = parseAbi([
   "function availableBalance(address token, address depositor) view returns (uint256)",
 ]);
 
+export type GatewayOnChainChain = "base" | "polygon";
+
 /** On-chain spendable USDC in Gateway (source of truth; API can lag after deposit). */
 export async function readOnChainGatewayAvailableUsdc(
   depositor: `0x${string}`,
-  rpcUrl?: string,
+  rpcUrl: string,
+  gatewayChain: GatewayOnChainChain = "base",
 ): Promise<number> {
+  const chain = gatewayChain === "polygon" ? polygon : base;
+  const usdc =
+    gatewayChain === "polygon" ? POLYGON_USDC_CONTRACT_ADDRESS : BASE_USDC_CONTRACT_ADDRESS;
   const client = createPublicClient({
-    chain: base,
-    transport: http(rpcUrl ?? "https://mainnet.base.org"),
+    chain,
+    transport: http(rpcUrl),
   });
   const raw = await client.readContract({
     address: MAINNET_GATEWAY_WALLET_ADDRESS,
     abi: gatewayWalletAbi,
     functionName: "availableBalance",
-    args: [BASE_USDC_CONTRACT_ADDRESS, depositor],
+    args: [usdc, depositor],
   });
   return Number.parseFloat(formatUnits(raw, 6));
 }
@@ -39,15 +49,19 @@ export async function getGatewayLiquiditySnapshot(
   depositor: `0x${string}`,
   apiFormattedAvailable: string,
   rpcUrls: string[],
+  gatewayChain: GatewayOnChainChain = "base",
 ): Promise<GatewayLiquiditySnapshot> {
   const apiAvailable = Number.parseFloat(apiFormattedAvailable);
   let onChainAvailable = 0;
   let lastError: unknown;
 
-  for (const rpcUrl of rpcUrls) {
-    if (!rpcUrl) continue;
+  for (const rpcUrl of sanitizeRpcUrls(rpcUrls)) {
     try {
-      onChainAvailable = await readOnChainGatewayAvailableUsdc(depositor, rpcUrl);
+      onChainAvailable = await readOnChainGatewayAvailableUsdc(
+        depositor,
+        rpcUrl,
+        gatewayChain,
+      );
       lastError = undefined;
       break;
     } catch (error) {

@@ -30,6 +30,8 @@ services:
         generateValue: true
       - key: BASE_RPC_URL
         value: https://mainnet.base.org
+      - key: POLYGON_RPC_URL
+        value: https://polygon.llamarpc.com
     disk:
       name: bookanai-data
       mountPath: /data

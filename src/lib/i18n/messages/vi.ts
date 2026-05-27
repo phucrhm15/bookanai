@@ -121,6 +121,11 @@ export const vi: typeof en = {
     contentCredits: "Content Credits",
     unifiedBadge: "Unified · Base + Arc",
     usdParity: "1 USDC = $1 USD · Circle Gateway unified balance",
+    spendableLabel: "Dùng được cho agent",
+    onChainLabel: "Ví on-chain",
+    settlementHoldLabel: "Đang settle sau lần chạy trước",
+    settlementHoldHint:
+      "USDC đang giữ khi các lần trả agent trước chuyển on-chain. Ở lại trang Wallet để xử lý; nạp thêm nếu số khả dụng thấp hơn giá agent.",
     loadingWallet: "Đang tải ví…",
     topUp: "Nạp tiền",
     withdraw: "Rút",

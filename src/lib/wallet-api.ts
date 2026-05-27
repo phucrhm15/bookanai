@@ -14,6 +14,10 @@ export type WalletApiResponse = {
   walletId: string;
   address: string;
   ledgerBalance: number;
+  /** min(ledger, on-chain − settlement hold) — what Studio can spend */
+  spendableCreditsUsdc?: number;
+  settlementHoldUsdc?: number;
+  onChainUsdc?: number;
   unifiedBalance?: UnifiedBalanceSnapshot;
   usdcContractAddress: string;
   networks?: {

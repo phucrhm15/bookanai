@@ -251,6 +251,28 @@ export type BatchSettlementResult = {
 };
 
 /**
+ * Processes queued user→master USDC transfers for one user (e.g. on Wallet page load).
+ */
+export async function processSettlementBatchForUser(
+  userId: string,
+): Promise<BatchSettlementResult> {
+  const db = getDb();
+  const pending = db
+    .select()
+    .from(pendingOnchainSettlements)
+    .where(
+      and(
+        eq(pendingOnchainSettlements.userId, userId),
+        inArray(pendingOnchainSettlements.status, ["pending", "submitted"]),
+      ),
+    )
+    .limit(BATCH_LIMIT)
+    .all();
+
+  return processSettlementRows(pending);
+}
+
+/**
  * Processes queued user→master USDC transfers (not run inside user HTTP requests).
  */
 export async function processSettlementBatch(): Promise<BatchSettlementResult> {
@@ -262,6 +284,13 @@ export async function processSettlementBatch(): Promise<BatchSettlementResult> {
     .limit(BATCH_LIMIT)
     .all();
 
+  return processSettlementRows(pending);
+}
+
+async function processSettlementRows(
+  pending: (typeof pendingOnchainSettlements.$inferSelect)[],
+): Promise<BatchSettlementResult> {
+  const db = getDb();
   const result: BatchSettlementResult = {
     processed: 0,
     completed: 0,
@@ -322,4 +351,31 @@ export async function processSettlementBatch(): Promise<BatchSettlementResult> {
   }
 
   return result;
+}
+
+export async function syncWalletCreditsForUser(
+  userId: string,
+  onChainTotalUsdc: number,
+): Promise<{
+  holdUsdc: number;
+  ledgerBalance: number;
+  spendableCreditsUsdc: number;
+  settlementBatch: BatchSettlementResult;
+  repair: RepairSettlementHoldsResult;
+}> {
+  await releaseStaleReservedSettlements(userId);
+  const settlementBatch = await processSettlementBatchForUser(userId);
+  const repair = await repairSettlementHolds(userId, onChainTotalUsdc);
+  const holdUsdc = getOnchainSettlementHoldUsdc(userId);
+  const { userStore } = await import("@/server/storage/user-store");
+  const user = userStore.reconcileDepositsFromOnChain(userId, onChainTotalUsdc, holdUsdc);
+  const spendableOnChain = Math.max(0, onChainTotalUsdc - holdUsdc);
+  const spendableCreditsUsdc = Math.min(user.ledgerBalance, spendableOnChain);
+  return {
+    holdUsdc,
+    ledgerBalance: user.ledgerBalance,
+    spendableCreditsUsdc,
+    settlementBatch,
+    repair,
+  };
 }

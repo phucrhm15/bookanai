@@ -39,6 +39,9 @@ export function WalletPage() {
 
   const address = data?.address ?? "";
   const balance = data?.ledgerBalance ?? data?.unifiedBalance?.totalUsdc ?? 0;
+  const spendable = data?.spendableCreditsUsdc ?? balance;
+  const onChain = data?.onChainUsdc ?? data?.unifiedBalance?.totalUsdc ?? 0;
+  const settlementHold = data?.settlementHoldUsdc ?? 0;
   const chainBreakdown = data?.unifiedBalance?.breakdown ?? [];
   const baseNetwork = data?.networks?.base ?? BASE_NETWORK;
   const arcNetwork = data?.networks?.arc ?? ARC_NETWORK;
@@ -72,6 +75,9 @@ export function WalletPage() {
           t={t}
           isLoading={isLoading}
           balance={balance}
+          spendable={spendable}
+          onChain={onChain}
+          settlementHold={settlementHold}
           address={address}
           shortAddress={shortAddress}
           usdcContract={usdcContract}
@@ -95,6 +101,9 @@ function BalanceCard({
   t,
   isLoading,
   balance,
+  spendable,
+  onChain,
+  settlementHold,
   address,
   shortAddress,
   usdcContract,
@@ -105,6 +114,9 @@ function BalanceCard({
   t: (key: string, params?: Record<string, string | number>) => string;
   isLoading: boolean;
   balance: number;
+  spendable: number;
+  onChain: number;
+  settlementHold: number;
   address: string;
   shortAddress: string;
   usdcContract: string;
@@ -144,6 +156,29 @@ function BalanceCard({
           <div className="mt-1 font-mono text-xs text-muted-foreground">
             {t("wallet.usdParity")}
           </div>
+
+          {!isLoading && (settlementHold > 0.000_001 || Math.abs(spendable - balance) > 0.000_001) && (
+            <ul className="mt-3 space-y-1 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs">
+              <li className="flex justify-between font-mono">
+                <span className="text-muted-foreground">{t("wallet.spendableLabel")}</span>
+                <span className="font-semibold text-foreground">{spendable.toFixed(4)} USDC</span>
+              </li>
+              <li className="flex justify-between font-mono text-muted-foreground">
+                <span>{t("wallet.onChainLabel")}</span>
+                <span>{onChain.toFixed(4)} USDC</span>
+              </li>
+              {settlementHold > 0.000_001 ? (
+                <li className="flex justify-between font-mono text-amber-600 dark:text-amber-400">
+                  <span>{t("wallet.settlementHoldLabel")}</span>
+                  <span>−{settlementHold.toFixed(4)} USDC</span>
+                </li>
+              ) : null}
+            </ul>
+          )}
+
+          {!isLoading && settlementHold > 0.001 ? (
+            <p className="mt-2 text-xs text-muted-foreground">{t("wallet.settlementHoldHint")}</p>
+          ) : null}
 
           {chainBreakdown.length > 0 && (
             <ul className="mt-3 space-y-1 rounded-md border border-border/50 bg-background/40 px-3 py-2 text-xs">

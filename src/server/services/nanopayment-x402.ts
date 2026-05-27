@@ -30,11 +30,9 @@ import {
 import {
   activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
-  getOnchainSettlementHoldUsdc,
   processSettlementBatch,
-  repairSettlementHolds,
-  releaseStaleReservedSettlements,
   reserveOnchainSettlement,
+  syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
 import { userStore, UserStoreError } from "@/server/storage/user-store";
 
@@ -180,24 +178,15 @@ export async function processNanopaymentX402(
   const agentPriceUsdc = probe.priceUsdc;
   console.info(`[x402] Dynamic agent price: ${agentPriceUsdc} USDC (HTTP ${probe.status})`);
 
-  await releaseStaleReservedSettlements(clerkId);
-
   const unified = await getUnifiedBalance(userWalletId);
-  await repairSettlementHolds(clerkId, unified.totalUsdc);
-  const onChainHold = getOnchainSettlementHoldUsdc(clerkId);
-  const ledgerUser = userStore.reconcileDepositsFromOnChain(
-    clerkId,
-    unified.totalUsdc,
-    onChainHold,
-  );
-  const spendableOnChain = Math.max(0, unified.totalUsdc - onChainHold);
-  const spendable = Math.min(ledgerUser.ledgerBalance, spendableOnChain);
+  const credits = await syncWalletCreditsForUser(clerkId, unified.totalUsdc);
+  const spendable = credits.spendableCreditsUsdc;
 
   if (spendable < agentPriceUsdc) {
     throw new CircleServiceError(
       `${INSUFFICIENT_MSG}. Cần ${agentPriceUsdc} USDC, khả dụng ${spendable.toFixed(6)} USDC ` +
-        `(ledger ${ledgerUser.ledgerBalance.toFixed(6)}, ví on-chain ${unified.totalUsdc.toFixed(6)}, ` +
-        `đang giữ chuyển ${onChainHold.toFixed(6)}). ` +
+        `(ledger ${credits.ledgerBalance.toFixed(6)}, ví on-chain ${unified.totalUsdc.toFixed(6)}, ` +
+        `đang giữ chuyển ${credits.holdUsdc.toFixed(6)}). ` +
         `Nạp USDC Base vào ví Content Credits hoặc mở Wallet để đồng bộ.`,
       "INSUFFICIENT_BALANCE",
     );

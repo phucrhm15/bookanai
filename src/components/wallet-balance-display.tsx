@@ -11,7 +11,11 @@ type WalletBalanceDisplayProps = {
 export function WalletBalanceDisplay({ variant = "header" }: WalletBalanceDisplayProps) {
   const { t } = useTranslation();
   const { data: wallet, isLoading, isError } = useWallet();
-  const balance = wallet?.ledgerBalance ?? wallet?.unifiedBalance?.totalUsdc ?? 0;
+  const balance =
+    wallet?.spendableCreditsUsdc ??
+    wallet?.ledgerBalance ??
+    wallet?.unifiedBalance?.totalUsdc ??
+    0;
 
   if (variant === "sidebar") {
     return (

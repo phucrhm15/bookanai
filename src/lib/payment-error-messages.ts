@@ -108,9 +108,15 @@ export function formatPaymentErrorForUser(
     const holdMatch = message.match(/đang giữ chuyển ([\d.]+)|hold ([\d.]+)/i);
     const ledgerMatch = message.match(/ledger ([\d.]+)/i);
     const onChainMatch = message.match(/ví on-chain ([\d.]+)|on-chain ([\d.]+)/i);
-    const hold = holdMatch ? Number(holdMatch[1]) : 0;
+    const hold = holdMatch ? Number(holdMatch[1] ?? holdMatch[2]) : 0;
     const ledger = ledgerMatch ? Number(ledgerMatch[1]) : 0;
     const onChain = onChainMatch ? Number(onChainMatch[1] ?? onChainMatch[2]) : 0;
+    const requiredMatch = message.match(/Cần ([\d.]+)|Required[:\s]+([\d.]+)/i);
+    const required = requiredMatch
+      ? Number(requiredMatch[1] ?? requiredMatch[2])
+      : 0;
+    const availMatch = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
+    const available = availMatch ? Number(availMatch[1] ?? availMatch[2]) : 0;
 
     if (locale === "vi") {
       let hint =
@@ -120,8 +126,13 @@ export function formatPaymentErrorForUser(
       } else if (hold > 0.001 && spendableLooksZero(message)) {
         hint =
           "Một phần số dư đang chờ chuyển on-chain (hoặc treo sau lỗi). Đợi 1–2 phút, refresh Wallet, thử lại.";
+      } else if (hold > 0.001 && onChain > ledger && required > available) {
+        const topUp = Math.max(0.01, required - available);
+        hint =
+          `~${hold.toFixed(3)} USDC đang chờ settle sau các lần chạy agent trước (ví on-chain ${onChain.toFixed(3)} USDC, credits khả dụng ${available.toFixed(3)}). ` +
+          `Nạp thêm ~${topUp.toFixed(2)} USDC (Base) hoặc chọn agent rẻ hơn (Surf ~0.001 USDC). Mở Wallet để xử lý settle.`;
       }
-      return `Số dư Content Credits không đủ cho lần gọi này. ${hint} (${message})`;
+      return `Số dư Content Credits không đủ cho lần gọi này. ${hint}`;
     }
 
     let hint = "Open Wallet & Billing → Top Up (USDC on Base). You do not need ETH in your wallet.";
@@ -130,8 +141,13 @@ export function formatPaymentErrorForUser(
     } else if (hold > 0.001 && spendableLooksZero(message)) {
       hint =
         "Part of your balance is pending on-chain transfer (or stuck after an error). Wait 1–2 minutes, refresh Wallet, retry.";
+    } else if (hold > 0.001 && onChain > ledger && required > available) {
+      const topUp = Math.max(0.01, required - available);
+      hint =
+        `~${hold.toFixed(3)} USDC is settling from earlier agent runs (on-chain ${onChain.toFixed(3)} USDC, spendable credits ${available.toFixed(3)}). ` +
+        `Top up ~${topUp.toFixed(2)} USDC on Base or pick a cheaper agent (Surf ~0.001 USDC). Open Wallet to process settlement.`;
     }
-    return `Insufficient Content Credits for this call. ${hint} (${message})`;
+    return `Insufficient Content Credits for this call. ${hint}`;
   }
 
   if (message.includes("Gateway batching") || message.includes("No Gateway batching")) {

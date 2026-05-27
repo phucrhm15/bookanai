@@ -117,6 +117,11 @@ export const en = {
     contentCredits: "Content Credits",
     unifiedBadge: "Unified · Base + Arc",
     usdParity: "1 USDC = $1 USD · Circle Gateway unified balance",
+    spendableLabel: "Spendable for agents",
+    onChainLabel: "On-chain wallet",
+    settlementHoldLabel: "Settling from past runs",
+    settlementHoldHint:
+      "USDC reserved while earlier agent payments transfer on-chain. Open this page to process; top up if spendable is below the agent price.",
     loadingWallet: "Loading wallet…",
     topUp: "Top Up",
     withdraw: "Withdraw",

@@ -1,5 +1,8 @@
-import { AppKit } from "@circle-fin/app-kit";
-import { createCircleWalletsAdapter } from "@circle-fin/adapter-circle-wallets";
+/**
+ * Circle App Kit — loaded via createRequire so Vite SSR does not bundle CJS into ESM
+ * (fixes "exports is not defined" on Render).
+ */
+import { createRequire } from "node:module";
 import {
   type SupportedChainId,
   unifiedBalanceChainForChainId,
@@ -15,15 +18,60 @@ import {
 } from "@/services/circleService";
 import { CircleServiceError } from "@/services/circle-errors";
 
-export type AppKitChainId = string;
+const require = createRequire(import.meta.url);
+
+type AppKitChainId = string;
+
+type CircleFinModules = {
+  AppKit: new (config?: { kitKey?: string }) => CircleAppKitClient;
+  createCircleWalletsAdapter: (opts: {
+    apiKey: string;
+    entitySecret: string;
+  }) => CircleWalletsAdapter;
+};
+
+type CircleAppKitClient = {
+  unifiedBalance: {
+    getBalances: (params: unknown) => Promise<{
+      totalConfirmedBalance?: string;
+      breakdown?: {
+        breakdown?: { chain: string; confirmedBalance?: string }[];
+      }[];
+    }>;
+    deposit: (params: unknown) => Promise<{ state?: string; txHash?: string; transactionHash?: string }>;
+    spend: (params: unknown) => Promise<{ state?: string }>;
+  };
+  bridge: (params: unknown) => Promise<{ state?: string }>;
+  swap: (params: unknown) => Promise<{ state?: string }>;
+  getSupportedChains: (op: string) => string[];
+};
+
+type CircleWalletsAdapter = object;
+
+export type { AppKitChainId };
 
 export type AppKitBalancesDto = {
   totalFormatted: string;
   perChain: { chain: string; amount: string }[];
 };
 
-let kitSingleton: AppKit | undefined;
-let adapterSingleton: ReturnType<typeof createCircleWalletsAdapter> | undefined;
+let circleFin: CircleFinModules | undefined;
+let kitSingleton: CircleAppKitClient | undefined;
+let adapterSingleton: CircleWalletsAdapter | undefined;
+
+function loadCircleFin(): CircleFinModules {
+  if (!circleFin) {
+    const appKitMod = require("@circle-fin/app-kit") as { AppKit: CircleFinModules["AppKit"] };
+    const adapterMod = require("@circle-fin/adapter-circle-wallets") as {
+      createCircleWalletsAdapter: CircleFinModules["createCircleWalletsAdapter"];
+    };
+    circleFin = {
+      AppKit: appKitMod.AppKit,
+      createCircleWalletsAdapter: adapterMod.createCircleWalletsAdapter,
+    };
+  }
+  return circleFin;
+}
 
 export function isAppKitConfigured(): boolean {
   return isCircleConfigured();
@@ -34,17 +82,19 @@ export function isAppKitSwapSendEnabled(): boolean {
   return Boolean(key && key.startsWith("KIT_KEY:"));
 }
 
-function getKit(): AppKit {
+function getKit(): CircleAppKitClient {
   if (!kitSingleton) {
+    const { AppKit } = loadCircleFin();
     const kitKey = process.env.CIRCLE_KIT_KEY?.trim();
     kitSingleton = kitKey ? new AppKit({ kitKey }) : new AppKit();
   }
   return kitSingleton;
 }
 
-function getCircleAdapter() {
+function getCircleAdapter(): CircleWalletsAdapter {
   if (!adapterSingleton) {
     const env = getServerEnv();
+    const { createCircleWalletsAdapter } = loadCircleFin();
     adapterSingleton = createCircleWalletsAdapter({
       apiKey: env.CIRCLE_API_KEY,
       entitySecret: env.ENTITY_SECRET,
@@ -65,8 +115,7 @@ export function chainIdToAppKitChain(chainId: number, apiKey: string): AppKitCha
 
 async function requireUserWallet(clerkId: string) {
   await ensureClerkUserWalletSynced(clerkId);
-  const row = userStore.requireByClerkId(clerkId);
-  return row;
+  return userStore.requireByClerkId(clerkId);
 }
 
 function formatKitError(error: unknown): string {
@@ -77,15 +126,13 @@ function formatKitError(error: unknown): string {
 export async function appKitGetSupportedChains(
   operation: "bridge" | "swap" | "unifiedBalance",
 ): Promise<string[]> {
-  const kit = getKit();
-  return kit.getSupportedChains(operation) as string[];
+  return getKit().getSupportedChains(operation);
 }
 
 export async function appKitGetBalances(clerkId: string): Promise<AppKitBalancesDto> {
   const row = await requireUserWallet(clerkId);
   const adapter = getCircleAdapter();
   const kit = getKit();
-  const env = getServerEnv();
 
   const result = await kit.unifiedBalance.getBalances({
     token: "USDC",
@@ -104,7 +151,6 @@ export async function appKitGetBalances(clerkId: string): Promise<AppKitBalances
     }
   }
 
-  void env;
   return { totalFormatted: total, perChain };
 }
 
@@ -136,14 +182,10 @@ export async function appKitDeposit(params: {
       unified.totalUsdc,
       hold,
     );
-    const state =
-      (result as { state?: string }).state ??
-      (result as { status?: string }).status ??
-      "submitted";
-    const txHash =
-      (result as { txHash?: string }).txHash ??
-      (result as { transactionHash?: string }).transactionHash;
-    return { state, txHash };
+    return {
+      state: result.state ?? "submitted",
+      txHash: result.txHash ?? result.transactionHash,
+    };
   } catch (error) {
     throw new CircleServiceError(
       `App Kit deposit failed: ${formatKitError(error)}`,
@@ -168,7 +210,7 @@ export async function appKitBridge(params: {
       to: { adapter, chain: params.toChain, address: row.address },
       amount: params.amount,
     });
-    return { state: (result as { state?: string }).state ?? "submitted" };
+    return { state: result.state ?? "submitted" };
   } catch (error) {
     throw new CircleServiceError(
       `App Kit bridge failed: ${formatKitError(error)}`,
@@ -177,7 +219,6 @@ export async function appKitBridge(params: {
   }
 }
 
-/** Withdraw / send USDC to any address via unified balance spend. */
 export async function appKitSpend(params: {
   clerkId: string;
   amount: string;
@@ -208,7 +249,7 @@ export async function appKitSpend(params: {
         useForwarder: true,
       },
     });
-    return { state: (result as { state?: string }).state ?? "submitted" };
+    return { state: result.state ?? "submitted" };
   } catch (error) {
     throw new CircleServiceError(
       `App Kit spend failed: ${formatKitError(error)}`,
@@ -241,7 +282,7 @@ export async function appKitSwap(params: {
       tokenOut: params.tokenOut,
       amountIn: params.amountIn,
     });
-    return { state: (result as { state?: string }).state ?? "submitted" };
+    return { state: result.state ?? "submitted" };
   } catch (error) {
     throw new CircleServiceError(
       `App Kit swap failed: ${formatKitError(error)}`,

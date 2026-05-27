@@ -11,3 +11,9 @@ const pkgJson = path.join(appRoot, "package.json");
 globalThis.__filename = pkgJson;
 globalThis.__dirname = appRoot;
 globalThis.require = createRequire(pkgJson);
+if (typeof globalThis.exports === "undefined") {
+  globalThis.exports = {};
+}
+if (typeof globalThis.module === "undefined") {
+  globalThis.module = { exports: globalThis.exports };
+}

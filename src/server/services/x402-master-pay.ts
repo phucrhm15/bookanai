@@ -71,6 +71,12 @@ function requirePolygonRpc(): string {
 
 type GatewayChainKey = "base" | "polygon" | "arcTestnet";
 
+function rpcCandidatesForGatewayChain(chain: GatewayChainKey): string[] {
+  if (chain === "polygon") return polygonRpcCandidates();
+  if (chain === "base") return rpcUrlCandidates();
+  return [getServerEnv().ARC_RPC_URL];
+}
+
 function rpcUrlForGatewayChain(chain: GatewayChainKey): string {
   if (chain === "polygon") return requirePolygonRpc();
   if (chain === "base") return rpcUrlCandidates()[0] ?? getServerEnv().BASE_RPC_URL;
@@ -84,17 +90,19 @@ async function resolveGatewayChainForResource(
   // Surf / nano.blockrun require GatewayWalletBatched on Polygon — try polygon before base.
   const order: GatewayChainKey[] = ["polygon", "base", "arcTestnet"];
   for (const chain of order) {
-    const gateway = new GatewayClient({
-      chain,
-      privateKey,
-      rpcUrl: rpcUrlForGatewayChain(chain),
-    });
-    const support = await gateway.supports(resourceUrl).catch(() => ({
-      supported: false as const,
-    }));
-    if (support.supported) {
-      console.info(`[x402] Gateway batching on ${chain} for ${resourceUrl}`);
-      return chain;
+    for (const rpcUrl of rpcCandidatesForGatewayChain(chain)) {
+      const gateway = new GatewayClient({
+        chain,
+        privateKey,
+        rpcUrl,
+      });
+      const support = await gateway.supports(resourceUrl).catch(() => ({
+        supported: false as const,
+      }));
+      if (support.supported) {
+        console.info(`[x402] Gateway batching on ${chain} (${rpcUrl}) for ${resourceUrl}`);
+        return chain;
+      }
     }
   }
   return null;
@@ -290,23 +298,36 @@ export async function payX402Resource(
 
   const gatewayChain = await resolveGatewayChainForResource(resourceUrl, privateKey);
   if (gatewayChain) {
-    const gateway = new GatewayClient({
-      chain: gatewayChain,
-      privateKey,
-      rpcUrl: rpcUrlForGatewayChain(gatewayChain),
-    });
-    try {
-      return await payViaGateway(gateway, gatewayChain, resourceUrl, minUsdc, init);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (
-        message.includes("Gateway batching") ||
-        message.includes("No Gateway batching")
-      ) {
-        return payViaExactEvm(resourceUrl, chainId, minUsdc, init);
+    let lastGatewayError: unknown;
+    for (const rpcUrl of rpcCandidatesForGatewayChain(gatewayChain)) {
+      const gateway = new GatewayClient({
+        chain: gatewayChain,
+        privateKey,
+        rpcUrl,
+      });
+      try {
+        return await payViaGateway(gateway, gatewayChain, resourceUrl, minUsdc, init);
+      } catch (error) {
+        lastGatewayError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        if (
+          message.includes("Gateway batching") ||
+          message.includes("No Gateway batching")
+        ) {
+          return payViaExactEvm(resourceUrl, chainId, minUsdc, init);
+        }
+        const isNetworkFailure =
+          message.includes("fetch failed") ||
+          message.includes("request failed") ||
+          message.includes("NETWORK_ERROR");
+        if (isNetworkFailure) {
+          console.warn(`[x402] Gateway pay retry with next RPC after failure on ${rpcUrl}:`, message);
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
+    if (lastGatewayError) throw lastGatewayError;
   }
 
   // Messari and other exact EIP-3009 sellers (not GatewayWalletBatched).

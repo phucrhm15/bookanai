@@ -45,10 +45,10 @@ function rpcUrlCandidates(): string[] {
 function polygonRpcCandidates(): string[] {
   const env = getServerEnv();
   return sanitizeRpcUrls([
-    env.POLYGON_RPC_URL,
     "https://polygon.llamarpc.com",
     "https://1rpc.io/matic",
     "https://rpc.ankr.com/polygon",
+    env.POLYGON_RPC_URL,
   ]);
 }
 

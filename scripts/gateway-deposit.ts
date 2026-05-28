@@ -6,8 +6,11 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createPublicClient, createWalletClient, formatUnits, http, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { readOnChainGatewayAvailableUsdc } from "../src/lib/gateway-onchain-balance";
+import { base, polygon } from "viem/chains";
+import { readOnChainGatewayAvailableUsdc, MAINNET_GATEWAY_WALLET_ADDRESS } from "../src/lib/gateway-onchain-balance";
+import { BASE_USDC_CONTRACT_ADDRESS, POLYGON_USDC_CONTRACT_ADDRESS } from "../src/lib/chains";
 
 for (const line of readFileSync(resolve(".env.local"), "utf8").split("\n")) {
   const t = line.trim();
@@ -27,9 +30,74 @@ const client = new GatewayClient({ chain, privateKey: pk });
 const before = await client.getBalances();
 console.log("Before — wallet:", before.wallet.formatted, "| gateway available:", before.gateway.formattedAvailable);
 
-const result = await client.deposit(amount);
-console.log("Deposit tx:", result.depositTxHash);
-if (result.approvalTxHash) console.log("Approve tx:", result.approvalTxHash);
+if (chain === "polygon") {
+  const account = privateKeyToAccount(pk);
+  const rpcUrl = process.env.POLYGON_RPC_URL ?? "https://1rpc.io/matic";
+  const publicClient = createPublicClient({ chain: polygon, transport: http(rpcUrl) });
+  const walletClient = createWalletClient({ account, chain: polygon, transport: http(rpcUrl) });
+  const depositAmount = parseUnits(amount, 6);
+
+  const erc20Abi = [
+    {
+      type: "function",
+      name: "allowance",
+      stateMutability: "view",
+      inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }],
+      outputs: [{ name: "", type: "uint256" }],
+    },
+    {
+      type: "function",
+      name: "approve",
+      stateMutability: "nonpayable",
+      inputs: [{ name: "spender", type: "address" }, { name: "value", type: "uint256" }],
+      outputs: [{ name: "", type: "bool" }],
+    },
+  ] as const;
+  const gatewayAbi = [
+    {
+      type: "function",
+      name: "deposit",
+      stateMutability: "nonpayable",
+      inputs: [{ name: "token", type: "address" }, { name: "amount", type: "uint256" }],
+      outputs: [],
+    },
+  ] as const;
+
+  const allowance = await publicClient.readContract({
+    address: POLYGON_USDC_CONTRACT_ADDRESS,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [account.address, MAINNET_GATEWAY_WALLET_ADDRESS],
+  });
+
+  let approvalTxHash: `0x${string}` | undefined;
+  if (allowance < depositAmount) {
+    approvalTxHash = await walletClient.writeContract({
+      address: POLYGON_USDC_CONTRACT_ADDRESS,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [MAINNET_GATEWAY_WALLET_ADDRESS, depositAmount],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });
+  }
+
+  const depositTxHash = await walletClient.writeContract({
+    address: MAINNET_GATEWAY_WALLET_ADDRESS,
+    abi: gatewayAbi,
+    functionName: "deposit",
+    args: [POLYGON_USDC_CONTRACT_ADDRESS, depositAmount],
+    // x402 SDK hardcodes 120k and often reverts on Polygon; use safer ceiling.
+    gas: 350000n,
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: depositTxHash });
+  console.log("Deposit tx:", depositTxHash);
+  if (approvalTxHash) console.log("Approve tx:", approvalTxHash);
+  console.log("Deposit receipt status:", receipt.status);
+} else {
+  const result = await client.deposit(amount);
+  console.log("Deposit tx:", result.depositTxHash);
+  if (result.approvalTxHash) console.log("Approve tx:", result.approvalTxHash);
+}
 
 const after = await client.getBalances();
 const onChain = await readOnChainGatewayAvailableUsdc(

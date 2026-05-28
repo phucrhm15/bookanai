@@ -1,5 +1,5 @@
 /** Max wait for master agent x402 Gateway.pay (marketplace X post generation). */
-export const MARKETPLACE_SETTLE_TIMEOUT_MS = 10_000;
+export const MARKETPLACE_SETTLE_TIMEOUT_MS = 30_000;
 
 /** Poll Circle DCW transfer until terminal state. */
 export const ONCHAIN_TRANSFER_POLL_TIMEOUT_MS = 90_000;

@@ -13,6 +13,8 @@ const PAYMENT_VERIFY_RE =
   /Payment verification failed|payment verification failed/i;
 const RPC_AUTH_RE =
   /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
+const MARKET_TIMEOUT_RE =
+  /AI Agent Marketplace did not respond within|did not respond within \d+ms|TIMEOUT/i;
 
 function spendableLooksZero(message: string): boolean {
   const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
@@ -89,6 +91,12 @@ export function formatPaymentErrorForUser(
       "Admin: set POLYGON_RPC_URL=https://polygon.llamarpc.com on Render, redeploy, " +
       "and ensure the master wallet has Gateway USDC on Polygon plus MATIC for gas."
     );
+  }
+
+  if (MARKET_TIMEOUT_RE.test(message)) {
+    return locale === "vi"
+      ? "Marketplace phản hồi chậm hơn dự kiến. Thử lại sau 5-10 giây. Nếu lỗi lặp lại, dùng Surf trước hoặc thử prompt ngắn hơn."
+      : "Marketplace responded slower than expected. Retry in 5-10 seconds. If it keeps happening, use Surf first or try a shorter prompt.";
   }
 
   if (PAYMENT_VERIFY_RE.test(message)) {

@@ -1,12 +1,13 @@
 /**
  * Deposit USDC from x402 EOA into Circle Gateway (required before client.pay works).
- * Usage: npm run gateway:deposit -- 0.05
+ * Usage:
+ *   npm run gateway:deposit -- 0.05 base
+ *   npm run gateway:deposit -- 0.05 polygon
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { readOnChainGatewayAvailableUsdc } from "../src/lib/gateway-onchain-balance";
-import { gatewayChainKeyForChainId, BASE_CHAIN_ID } from "../src/lib/chains";
 
 for (const line of readFileSync(resolve(".env.local"), "utf8").split("\n")) {
   const t = line.trim();
@@ -17,8 +18,9 @@ for (const line of readFileSync(resolve(".env.local"), "utf8").split("\n")) {
 }
 
 const amount = process.argv[2] ?? "0.05";
+const chainArg = (process.argv[3] ?? "base").toLowerCase();
+const chain = chainArg === "polygon" ? "polygon" : "base";
 const pk = process.env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`;
-const chain = gatewayChainKeyForChainId(BASE_CHAIN_ID);
 const { GatewayClient } = await import("@circle-fin/x402-batching/client");
 const client = new GatewayClient({ chain, privateKey: pk });
 
@@ -32,6 +34,7 @@ if (result.approvalTxHash) console.log("Approve tx:", result.approvalTxHash);
 const after = await client.getBalances();
 const onChain = await readOnChainGatewayAvailableUsdc(
   privateKeyToAccount(pk).address,
-  process.env.BASE_RPC_URL,
+  chain === "polygon" ? process.env.POLYGON_RPC_URL : process.env.BASE_RPC_URL,
+  chain,
 );
 console.log("After — wallet:", after.wallet.formatted, "| gateway API:", after.gateway.formattedAvailable, "| on-chain:", onChain.toFixed(6));

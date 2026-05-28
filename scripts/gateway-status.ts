@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { privateKeyToAccount } from "viem/accounts";
 import { readOnChainGatewayAvailableUsdc } from "../src/lib/gateway-onchain-balance";
-import { gatewayChainKeyForChainId, BASE_CHAIN_ID } from "../src/lib/chains";
 
 for (const line of readFileSync(resolve(".env.local"), "utf8").split("\n")) {
   const t = line.trim();
@@ -13,7 +12,8 @@ for (const line of readFileSync(resolve(".env.local"), "utf8").split("\n")) {
 }
 
 const pk = process.env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`;
-const chain = gatewayChainKeyForChainId(BASE_CHAIN_ID);
+const chainArg = (process.argv[2] ?? "base").toLowerCase();
+const chain = chainArg === "polygon" ? "polygon" : "base";
 const { GatewayClient } = await import("@circle-fin/x402-batching/client");
 const client = new GatewayClient({ chain, privateKey: pk });
 
@@ -21,7 +21,8 @@ const address = privateKeyToAccount(pk).address;
 const balances = await client.getBalances();
 const onChainAvailable = await readOnChainGatewayAvailableUsdc(
   address,
-  process.env.BASE_RPC_URL,
+  chain === "polygon" ? process.env.POLYGON_RPC_URL : process.env.BASE_RPC_URL,
+  chain,
 );
 const effectiveAvailable = Math.max(
   Number.parseFloat(balances.gateway.formattedAvailable) || 0,
@@ -38,6 +39,10 @@ console.log("Effective for pay:", effectiveAvailable.toFixed(6));
 
 if (effectiveAvailable < 0.01) {
   console.log("\nGateway balance is empty — nanopayments will fail until you deposit:");
-  console.log("  npm run gateway:deposit -- 0.05");
-  console.log("(Requires USDC + ETH for gas on the x402 EOA above)");
+  console.log(`  npm run gateway:deposit -- 0.05 ${chain}`);
+  console.log(
+    chain === "polygon"
+      ? "(Requires USDC + MATIC gas on Polygon for the x402 EOA above)"
+      : "(Requires USDC + ETH gas on Base for the x402 EOA above)",
+  );
 }

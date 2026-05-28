@@ -15,6 +15,7 @@ const RPC_AUTH_RE =
   /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
 const MARKET_TIMEOUT_RE =
   /AI Agent Marketplace did not respond within|did not respond within \d+ms|TIMEOUT/i;
+const POLYGON_CONTEXT_RE = /polygon|eip155:137|surf|nano\.blockrun/i;
 
 function spendableLooksZero(message: string): boolean {
   const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
@@ -42,19 +43,28 @@ export function formatPaymentErrorForUser(
 
   if (MASTER_USDC_RE.test(message)) {
     const addr = extractAddress(message);
+    const needsPolygon = POLYGON_CONTEXT_RE.test(message);
     if (locale === "vi") {
       return (
-        "Hệ thống chưa đủ USDC để trả API cho agent (ví x402 của server, không phải ví Content Credits của bạn). " +
+        `Hệ thống chưa đủ USDC để trả API cho agent (ví x402 của server, không phải ví Content Credits của bạn). ` +
         (addr
-          ? `Admin nạp thêm USDC (Base) vào ${addr} hoặc chạy: npm run gateway:deposit -- 0.15`
-          : "Admin chạy: npm run show:x402 rồi npm run gateway:deposit -- 0.15")
+          ? needsPolygon
+            ? `Admin nạp USDC + MATIC trên Polygon vào ${addr}, rồi chạy: npm run gateway:deposit -- 0.05 polygon`
+            : `Admin nạp thêm USDC (Base) vào ${addr} hoặc chạy: npm run gateway:deposit -- 0.15`
+          : needsPolygon
+            ? "Admin chạy: npm run show:x402 rồi nạp USDC + MATIC trên Polygon, sau đó: npm run gateway:deposit -- 0.05 polygon"
+            : "Admin chạy: npm run show:x402 rồi npm run gateway:deposit -- 0.15")
       );
     }
     return (
       "The server does not have enough USDC to pay the agent API (x402 master wallet, not your Content Credits). " +
       (addr
-        ? `Admin: deposit USDC on Base to ${addr} or run: npm run gateway:deposit -- 0.15`
-        : "Admin: npm run show:x402 then npm run gateway:deposit -- 0.15")
+        ? needsPolygon
+          ? `Admin: fund ${addr} with USDC + MATIC on Polygon, then run: npm run gateway:deposit -- 0.05 polygon`
+          : `Admin: deposit USDC on Base to ${addr} or run: npm run gateway:deposit -- 0.15`
+        : needsPolygon
+          ? "Admin: npm run show:x402, fund USDC + MATIC on Polygon, then run: npm run gateway:deposit -- 0.05 polygon"
+          : "Admin: npm run show:x402 then npm run gateway:deposit -- 0.15")
     );
   }
 

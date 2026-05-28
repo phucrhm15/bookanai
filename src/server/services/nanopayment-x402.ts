@@ -80,6 +80,19 @@ function messariAthQuery(prompt?: string): string {
   return params.toString();
 }
 
+function inferSurfSymbol(prompt?: string): string {
+  const text = (prompt ?? "").toUpperCase();
+  const fromDollar = text.match(/\$([A-Z0-9]{2,12})\b/);
+  if (fromDollar?.[1]) return fromDollar[1];
+  const candidates = text.match(/\b[A-Z]{2,12}\b/g) ?? [];
+  for (const token of candidates) {
+    if (!["API", "JSON", "HTTP", "USDC", "BASE", "X", "THREAD"].includes(token)) {
+      return token;
+    }
+  }
+  return "AAVE";
+}
+
 export function payOptionsForAgent(
   agentServiceId: string,
   prompt?: string,
@@ -120,9 +133,19 @@ export function withAgentResourceQuery(
   resourceUrl: string,
   prompt?: string,
 ): string {
-  if (agentServiceId !== "messari-analyst") return resourceUrl;
-  const sep = resourceUrl.includes("?") ? "&" : "?";
-  return `${resourceUrl}${sep}${messariAthQuery(prompt)}`;
+  if (agentServiceId === "messari-analyst") {
+    const sep = resourceUrl.includes("?") ? "&" : "?";
+    return `${resourceUrl}${sep}${messariAthQuery(prompt)}`;
+  }
+  if (agentServiceId === "surf-tokenomics") {
+    // Surf tokenomics requires one of `id` or `symbol`.
+    const u = new URL(resourceUrl);
+    if (!u.searchParams.has("id") && !u.searchParams.has("symbol")) {
+      u.searchParams.set("symbol", inferSurfSymbol(prompt));
+    }
+    return u.toString();
+  }
+  return resourceUrl;
 }
 
 export async function processNanopaymentX402(

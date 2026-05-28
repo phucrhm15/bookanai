@@ -184,18 +184,109 @@ async function ensureGatewayLiquidity(
 
 async function payViaGateway(
   gateway: GatewayClient,
+  privateKey: `0x${string}`,
   gatewayChain: GatewayChainKey,
   resourceUrl: string,
   minUsdc: number,
   init?: X402PayRequestInit,
 ): Promise<X402PayResult> {
   await ensureGatewayLiquidity(gateway, gatewayChain, minUsdc);
-  const result = await gateway.pay(resourceUrl, {
-    method: init?.method ?? "GET",
-    headers: init?.headers,
-    body: init?.body,
+
+  const method = init?.method ?? "GET";
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...init?.headers,
+  };
+  const serializedBody =
+    init?.body === undefined
+      ? undefined
+      : typeof init.body === "string"
+        ? init.body
+        : JSON.stringify(init.body);
+
+  const initialResponse = await fetch(resourceUrl, {
+    method,
+    headers,
+    body: serializedBody,
   });
-  return { status: result.status ?? 200, data: result.data };
+
+  if (initialResponse.status !== 402) {
+    const text = await initialResponse.text();
+    const data = parseResponseBody(text);
+    if (!initialResponse.ok) {
+      throw new CircleServiceError(
+        `Gateway preflight failed (${initialResponse.status}): ${text.slice(0, 500)}`,
+        "SETTLEMENT_FAILED",
+      );
+    }
+    return { status: initialResponse.status, data };
+  }
+
+  const accepts = parsePaymentRequiredAcceptsFromHeader(initialResponse);
+  const expectedNetwork = gatewayChain === "polygon" ? "eip155:137" : "eip155:8453";
+  const batchingOption = accepts.find((opt) => {
+    const extra = opt.extra as Record<string, unknown> | undefined;
+    return (
+      opt.network === expectedNetwork &&
+      extra?.name === "GatewayWalletBatched" &&
+      extra?.version === "1"
+    );
+  });
+
+  if (!batchingOption) {
+    throw new CircleServiceError(
+      `No GatewayWalletBatched option for ${expectedNetwork} in PAYMENT-REQUIRED`,
+      "SETTLEMENT_FAILED",
+    );
+  }
+
+  const raw = initialResponse.headers.get("PAYMENT-REQUIRED") ?? initialResponse.headers.get("payment-required");
+  const paymentRequired = raw
+    ? (JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as {
+        x402Version?: number;
+        resource?: unknown;
+      })
+    : { x402Version: 2 };
+
+  const paymentPayload = await (gateway as unknown as {
+    createPaymentPayload: (
+      version: number,
+      requirements: PaymentRequiredAccept,
+    ) => Promise<Record<string, unknown>>;
+  }).createPaymentPayload(paymentRequired.x402Version ?? 2, batchingOption);
+
+  const paymentHeader = Buffer.from(
+    JSON.stringify({
+      ...paymentPayload,
+      resource: paymentRequired.resource,
+      accepted: batchingOption,
+    }),
+  ).toString("base64");
+
+  const paidResponse = await fetch(resourceUrl, {
+    method,
+    headers: {
+      ...headers,
+      "Payment-Signature": paymentHeader,
+    },
+    body: serializedBody,
+  });
+
+  const paidText = await paidResponse.text();
+  const paidData = parseResponseBody(paidText);
+  if (!paidResponse.ok) {
+    const detail =
+      typeof paidData === "object" && paidData
+        ? JSON.stringify(paidData).slice(0, 800)
+        : paidText.slice(0, 800);
+    throw new CircleServiceError(
+      `Gateway payment failed (${paidResponse.status}) on ${expectedNetwork}: ${detail}`,
+      "SETTLEMENT_FAILED",
+    );
+  }
+
+  return { status: paidResponse.status, data: paidData };
 }
 
 async function payViaExactEvm(
@@ -306,7 +397,7 @@ export async function payX402Resource(
         rpcUrl,
       });
       try {
-        return await payViaGateway(gateway, gatewayChain, resourceUrl, minUsdc, init);
+        return await payViaGateway(gateway, privateKey, gatewayChain, resourceUrl, minUsdc, init);
       } catch (error) {
         lastGatewayError = error;
         const message = error instanceof Error ? error.message : String(error);
@@ -342,6 +433,7 @@ export async function payX402Resource(
   if (legacySupport.supported) {
     return payViaGateway(
       legacyGateway,
+      privateKey,
       gatewayChainKeyForChainId(chainId),
       resourceUrl,
       minUsdc,

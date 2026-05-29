@@ -28,8 +28,14 @@ export const Route = createFileRoute("/api/debug/x402")({
                 privateKey: env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`,
                 rpcUrl,
               });
-              const balances = await client.getBalances();
-              return { available: balances.gateway.formattedAvailable };
+              // getBalance() hits Circle Gateway API over HTTP (no RPC) — this is
+              // what the real pay path uses.
+              const gatewayBalance = await (
+                client as unknown as {
+                  getBalance: (a?: string) => Promise<{ formattedAvailable: string }>;
+                }
+              ).getBalance(masterAddress);
+              return { available: gatewayBalance.formattedAvailable };
             } catch (error) {
               return {
                 available: "0",

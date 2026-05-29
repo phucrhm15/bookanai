@@ -45,6 +45,7 @@ function rpcUrlCandidates(): string[] {
 function polygonRpcCandidates(): string[] {
   const env = getServerEnv();
   return sanitizeRpcUrls([
+    "https://polygon-bor-rpc.publicnode.com",
     "https://polygon.llamarpc.com",
     "https://1rpc.io/matic",
     "https://rpc.ankr.com/polygon",
@@ -154,30 +155,47 @@ async function ensureGatewayLiquidity(
   gatewayChain: GatewayChainKey,
   minUsdc: number,
 ): Promise<void> {
-  const balances = await gateway.getBalances();
   const depositor = masterDepositorAddress();
-  const rpcUrls =
-    gatewayChain === "polygon" ? polygonRpcCandidates() : rpcUrlCandidates();
-  const onChainChain = gatewayChain === "polygon" ? "polygon" : "base";
-  const snapshot = await getGatewayLiquiditySnapshot(
-    depositor,
-    balances.gateway.formattedAvailable,
-    rpcUrls,
-    onChainChain,
-  );
 
-  if (snapshot.effectiveAvailable < minUsdc) {
+  // Circle Gateway available balance via HTTP API (no RPC dependency — survives
+  // broken POLYGON_RPC_URL such as wss:// endpoints).
+  const gatewayBalance = await (
+    gateway as unknown as {
+      getBalance: (address?: string) => Promise<{ formattedAvailable: string }>;
+    }
+  ).getBalance(depositor);
+  const apiAvailable = Number.parseFloat(gatewayBalance.formattedAvailable) || 0;
+
+  // On-chain read is best-effort (extra safety when API lags); never blocks pay.
+  let onChainAvailable = 0;
+  try {
+    const rpcUrls =
+      gatewayChain === "polygon" ? polygonRpcCandidates() : rpcUrlCandidates();
+    const onChainChain = gatewayChain === "polygon" ? "polygon" : "base";
+    const snapshot = await getGatewayLiquiditySnapshot(
+      depositor,
+      gatewayBalance.formattedAvailable,
+      rpcUrls,
+      onChainChain,
+    );
+    onChainAvailable = snapshot.onChainAvailable;
+  } catch (error) {
+    console.warn("[gateway] on-chain liquidity read skipped:", error);
+  }
+
+  const effectiveAvailable = Math.max(apiAvailable, onChainAvailable);
+
+  if (effectiveAvailable < minUsdc) {
     throw new CircleServiceError(
-      `Circle Gateway thiếu USDC (${gatewayChain}): API ${snapshot.apiAvailable.toFixed(6)}, on-chain ${snapshot.onChainAvailable.toFixed(6)}, cần ~${minUsdc}. ` +
-        `Ví Master EOA: ${balances.wallet.formatted} USDC (${depositor}). ` +
+      `Circle Gateway thiếu USDC (${gatewayChain}): API ${apiAvailable.toFixed(6)}, on-chain ${onChainAvailable.toFixed(6)}, cần ~${minUsdc} (${depositor}). ` +
         `Surf cần Gateway trên Polygon — nạp USDC + MATIC gas cho master, hoặc npm run gateway:deposit trên đúng chain.`,
       "INSUFFICIENT_BALANCE",
     );
   }
 
-  if (snapshot.apiAvailable < minUsdc && snapshot.onChainAvailable >= minUsdc) {
+  if (apiAvailable < minUsdc && onChainAvailable >= minUsdc) {
     console.info(
-      `[gateway] API balance lag (${snapshot.apiAvailable} USDC); paying from on-chain ${snapshot.onChainAvailable} USDC`,
+      `[gateway] API balance lag (${apiAvailable} USDC); paying from on-chain ${onChainAvailable} USDC`,
     );
   }
 }

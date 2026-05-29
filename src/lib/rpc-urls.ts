@@ -3,7 +3,10 @@ const BLOCKED_RPC_HOSTS = ["polygon-rpc.com"] as const;
 
 export function isBlockedRpcUrl(url: string): boolean {
   try {
-    const host = new URL(url).hostname.toLowerCase();
+    const parsed = new URL(url);
+    // viem http() transport cannot use websocket endpoints.
+    if (parsed.protocol === "ws:" || parsed.protocol === "wss:") return true;
+    const host = parsed.hostname.toLowerCase();
     return BLOCKED_RPC_HOSTS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`));
   } catch {
     return false;

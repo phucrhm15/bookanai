@@ -107,6 +107,8 @@ export const en = {
     settlementTx: "tx {{id}}…",
     walletNotLoaded: "Wallet not loaded. Open Wallet & Billing or refresh, then try again.",
     paymentFailedGeneric: "x402 payment failed",
+    creditsRefundedHint:
+      "Content Credits were refunded — your balance is unchanged because the API payment failed.",
   },
   wallet: {
     badge: "Wallet & Billing",

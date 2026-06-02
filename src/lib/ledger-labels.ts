@@ -18,8 +18,9 @@ const LEGACY_EXACT: Record<string, { key: string; param?: (label: string) => Rec
   };
 
 function fromI18nLabel(label: string, locale: Locale): string | undefined {
-  if (!label.startsWith("i18n:")) return undefined;
-  const body = label.slice(4);
+  const prefix = "i18n:";
+  if (!label.startsWith(prefix)) return undefined;
+  const body = label.slice(prefix.length);
   const parts = body.split(":");
 
   if (parts[0] === "deposit.sync") {

@@ -110,6 +110,8 @@ export const vi: typeof en = {
     settlementTx: "tx {{id}}…",
     walletNotLoaded: "Chưa tải ví. Mở Wallet & Billing hoặc refresh rồi thử lại.",
     paymentFailedGeneric: "Thanh toán x402 thất bại",
+    creditsRefundedHint:
+      "Content Credits đã được hoàn lại — số dư ví không giảm vì thanh toán API thất bại.",
   },
   wallet: {
     badge: "Ví & Thanh toán",

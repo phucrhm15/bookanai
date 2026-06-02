@@ -12,6 +12,7 @@ import { BASE_CHAIN_ID, BASE_NETWORK } from "@/lib/chains";
 import { postNanopayment } from "@/lib/wallet-api";
 import { agentPromptMismatch } from "@/lib/agent-prompt-hints";
 import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
+import { translate } from "@/lib/i18n/translate";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import { useWallet, walletQueryKey } from "@/hooks/use-wallet";
 
@@ -251,13 +252,24 @@ function formatNanopaymentError(
   agentId: string,
   locale: import("@/lib/i18n/types").Locale,
 ): string {
+  let formatted: string;
   if (message.includes("Payment settlement failed") && agentId === "perplexity-social") {
-    return formatPaymentErrorForUser(
+    formatted = formatPaymentErrorForUser(
       `${message} · Admin: npm run gateway:status (Gateway ≥ 0.012 USDC)`,
       locale,
     );
+  } else {
+    formatted = formatPaymentErrorForUser(message, locale);
   }
-  return formatPaymentErrorForUser(message, locale);
+
+  const noRefund =
+    /INSUFFICIENT_BALANCE|Số dư không đủ|Insufficient Content Credits|DUPLICATE_PAYMENT/i.test(
+      message,
+    );
+  if (!noRefund) {
+    formatted += ` ${translate(locale, "studio.creditsRefundedHint")}`;
+  }
+  return formatted;
 }
 
 function StatusPill({ label, active, done }: { label: string; active: boolean; done: boolean }) {

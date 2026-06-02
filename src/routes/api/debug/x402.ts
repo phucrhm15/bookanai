@@ -1,15 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { privateKeyToAccount } from "viem/accounts";
+import { isAuthorizedAdminRequest } from "@/server/auth/admin-secret";
 import { getServerEnv } from "@/server/config/env";
 
 /**
- * Read-only diagnostics: what the running server actually sees for x402 Gateway.
- * Exposes only non-sensitive values (public master address + balances + commit).
+ * Operator-only diagnostics (Bearer SETTLEMENT_CRON_SECRET).
+ * Disabled in production when secret is unset.
  */
 export const Route = createFileRoute("/api/debug/x402")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        if (!isAuthorizedAdminRequest(request)) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
         try {
           const env = getServerEnv();
           const masterAddress = privateKeyToAccount(

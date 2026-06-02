@@ -27,3 +27,13 @@ Never commit:
 - `circle-entity-recovery.dat`
 
 Rotate any key that was accidentally pushed and force-remove it from git history if needed.
+
+## Operator endpoints
+
+These routes require `Authorization: Bearer <SETTLEMENT_CRON_SECRET>` in production:
+
+- `GET /api/debug/x402`
+- `GET /api/master/status`
+- `POST /api/cron/settle-batch`
+
+Do not expose `SETTLEMENT_CRON_SECRET` in client-side code.

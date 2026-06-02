@@ -71,7 +71,7 @@ npm run health
 npm run cron:settle        # chuyển user→master on-chain (hoặc cron HTTP)
 ```
 
-`GET /api/master/status` — cần header `Authorization: Bearer <SETTLEMENT_CRON_SECRET>` trên production.
+`GET /api/master/status` và `GET /api/debug/x402` — cần header `Authorization: Bearer <SETTLEMENT_CRON_SECRET>` trên production (operator only).
 
 ## Host miễn phí (0 đồng server)
 

@@ -152,7 +152,7 @@ export async function fetchDiscoveryResources(): Promise<DiscoveryItem[]> {
   return discoveryCache;
 }
 
-function findDiscoveryItem(
+export function findDiscoveryItemForResource(
   items: DiscoveryItem[],
   resourceUrl: string,
 ): DiscoveryItem | undefined {
@@ -181,6 +181,13 @@ function findDiscoveryItem(
   }
 }
 
+export async function getDiscoveryCatalogItem(
+  resourceUrl: string,
+): Promise<DiscoveryItem | undefined> {
+  const items = await fetchDiscoveryResources();
+  return findDiscoveryItemForResource(items, resourceUrl);
+}
+
 /**
  * Resolve a paid x402 resource URL for a Studio agent id.
  * Circle Discovery exact match first; Messari uses direct x402 catalog when absent.
@@ -202,7 +209,7 @@ export async function resolveAgentResource(
   }
 
   const discoveryItem =
-    findDiscoveryItem(items, mappedUrl) ??
+    findDiscoveryItemForResource(items, mappedUrl) ??
     ({ resource: mappedUrl, type: "http" } satisfies DiscoveryItem);
 
   assertX402ResourceHost(discoveryItem.resource, items);

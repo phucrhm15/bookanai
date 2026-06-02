@@ -10,7 +10,10 @@ const GAS_RE =
 const NETWORK_SCHEME_RE =
   /No network\/scheme registered|x402Version|paymentRequirements|eip155:137|GatewayWalletBatched/i;
 const PAYMENT_VERIFY_RE =
-  /Payment verification failed|payment verification failed/i;
+  /Payment verification failed|payment verification failed|x402 verify failed/i;
+const AISA_API_KEY_RE = /invalid api key/i;
+const MESSARI_WALLET_USDC_RE =
+  /thiếu USDC on-chain trên Base|USDC on-chain on Base/i;
 const RPC_AUTH_RE =
   /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
 const MARKET_TIMEOUT_RE =
@@ -107,6 +110,32 @@ export function formatPaymentErrorForUser(
     return locale === "vi"
       ? "Marketplace phản hồi chậm hơn dự kiến. Thử lại sau 5-10 giây. Nếu lỗi lặp lại, dùng Surf trước hoặc thử prompt ngắn hơn."
       : "Marketplace responded slower than expected. Retry in 5-10 seconds. If it keeps happening, use Surf first or try a shorter prompt.";
+  }
+
+  if (MESSARI_WALLET_USDC_RE.test(message)) {
+    if (locale === "vi") {
+      return (
+        "Messari dùng x402 exact trên Base — cần USDC trong ví master on-chain (~0.1 USDC/lần), " +
+        "không chỉ trong Circle Gateway. Admin: npm run show:x402 → nạp USDC (Base) vào địa chỉ in ra."
+      );
+    }
+    return (
+      "Messari uses exact x402 on Base — the master wallet needs on-chain USDC (~0.1 USDC/call), " +
+      "not only Circle Gateway balance. Admin: npm run show:x402 → fund USDC on Base at the printed address."
+    );
+  }
+
+  if (AISA_API_KEY_RE.test(message)) {
+    if (locale === "vi") {
+      return (
+        "API AIsa (Perplexity) từ chối yêu cầu — marketplace có thể đang lỗi (endpoint không trả HTTP 402 đúng chuẩn x402). " +
+        "Thử agent Surf (đã hoạt động khi Gateway Polygon đủ USDC) hoặc liên hệ Circle/AIsa. Gateway Base admin: npm run gateway:status."
+      );
+    }
+    return (
+      "AIsa (Perplexity) rejected the request — the marketplace endpoint may be misconfigured (no proper HTTP 402). " +
+      "Try Surf (works when Polygon Gateway is funded) or contact Circle/AIsa. Admin: npm run gateway:status for Base Gateway."
+    );
   }
 
   if (PAYMENT_VERIFY_RE.test(message)) {

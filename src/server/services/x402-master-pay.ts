@@ -3,12 +3,15 @@
  * - Circle Gateway batching (AIsa / Discovery sellers)
  * - Standard EIP-3009 exact (Messari and other non-Gateway sellers)
  */
+import { createPublicClient, formatUnits, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { base } from "viem/chains";
 import { x402Client } from "@x402/core/client";
 import { x402HTTPClient } from "@x402/core/http";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { GatewayClient } from "@circle-fin/x402-batching/client";
 import {
+  BASE_USDC_CONTRACT_ADDRESS,
   gatewayChainKeyForChainId,
   type SupportedChainId,
 } from "@/lib/chains";
@@ -16,6 +19,14 @@ import { getGatewayLiquiditySnapshot } from "@/lib/gateway-onchain-balance";
 import { sanitizeRpcUrls } from "@/lib/rpc-urls";
 import { getServerEnv } from "@/server/config/env";
 import { CircleServiceError } from "@/services/circle-errors";
+import {
+  getDiscoveryCatalogItem,
+  type DiscoveryAccept,
+} from "@/services/agent-service-map";
+
+const erc20BalanceAbi = parseAbi([
+  "function balanceOf(address account) view returns (uint256)",
+]);
 
 export type X402PayRequestInit = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -84,6 +95,68 @@ function rpcUrlForGatewayChain(chain: GatewayChainKey): string {
   return getServerEnv().ARC_RPC_URL;
 }
 
+function expectedNetworkForGatewayChain(chain: GatewayChainKey): string {
+  if (chain === "polygon") return "eip155:137";
+  if (chain === "base") return "eip155:8453";
+  return "eip155:5042002";
+}
+
+function pickGatewayBatchingOption(
+  accepts: PaymentRequiredAccept[],
+  gatewayChain: GatewayChainKey,
+): PaymentRequiredAccept | undefined {
+  const expectedNetwork = expectedNetworkForGatewayChain(gatewayChain);
+  return accepts.find((opt) => {
+    const extra = opt.extra as Record<string, unknown> | undefined;
+    return (
+      opt.network === expectedNetwork &&
+      extra?.name === "GatewayWalletBatched" &&
+      extra?.version === "1"
+    );
+  });
+}
+
+function gatewayChainFromDiscoveryAccepts(
+  accepts: DiscoveryAccept[],
+  resourceUrl: string,
+): GatewayChainKey | null {
+  const asPayment = accepts as PaymentRequiredAccept[];
+  const host = new URL(resourceUrl).hostname.toLowerCase();
+  const order: GatewayChainKey[] =
+    host === "nano.blockrun.ai" ? ["polygon", "base"] : ["base", "polygon"];
+  for (const chain of order) {
+    if (pickGatewayBatchingOption(asPayment, chain)) return chain;
+  }
+  return null;
+}
+
+async function readMasterBaseWalletUsdc(): Promise<number> {
+  const depositor = masterDepositorAddress();
+  const client = createPublicClient({
+    chain: base,
+    transport: http(rpcUrlCandidates()[0] ?? getServerEnv().BASE_RPC_URL),
+  });
+  const raw = await client.readContract({
+    address: BASE_USDC_CONTRACT_ADDRESS,
+    abi: erc20BalanceAbi,
+    functionName: "balanceOf",
+    args: [depositor],
+  });
+  return Number.parseFloat(formatUnits(raw, 6));
+}
+
+async function ensureMasterWalletUsdcOnBase(minUsdc: number): Promise<void> {
+  const walletUsdc = await readMasterBaseWalletUsdc();
+  if (walletUsdc + 1e-9 < minUsdc) {
+    const depositor = masterDepositorAddress();
+    throw new CircleServiceError(
+      `Ví master thiếu USDC on-chain trên Base (${walletUsdc.toFixed(6)} < ${minUsdc} USDC) cho x402 exact (Messari). ` +
+        `Nạp USDC trực tiếp vào ${depositor} trên Base — khác với npm run gateway:deposit.`,
+      "INSUFFICIENT_BALANCE",
+    );
+  }
+}
+
 async function resolveGatewayChainForResource(
   resourceUrl: string,
   privateKey: `0x${string}`,
@@ -104,6 +177,15 @@ async function resolveGatewayChainForResource(
         console.info(`[x402] Gateway batching on ${chain} (${rpcUrl}) for ${resourceUrl}`);
         return chain;
       }
+    }
+  }
+
+  const catalog = await getDiscoveryCatalogItem(resourceUrl);
+  if (catalog?.accepts?.length) {
+    const fromCatalog = gatewayChainFromDiscoveryAccepts(catalog.accepts, resourceUrl);
+    if (fromCatalog) {
+      console.info(`[x402] Gateway chain from Discovery catalog: ${fromCatalog} for ${resourceUrl}`);
+      return fromCatalog;
     }
   }
   return null;
@@ -228,44 +310,53 @@ async function payViaGateway(
     headers,
     body: serializedBody,
   });
+  const initialText = await initialResponse.text();
 
-  if (initialResponse.status !== 402) {
-    const text = await initialResponse.text();
-    const data = parseResponseBody(text);
-    if (!initialResponse.ok) {
-      throw new CircleServiceError(
-        `Gateway preflight failed (${initialResponse.status}): ${text.slice(0, 500)}`,
-        "SETTLEMENT_FAILED",
-      );
+  let batchingOption: PaymentRequiredAccept | undefined;
+  let paymentRequired: { x402Version?: number; resource?: unknown };
+
+  if (initialResponse.status === 402) {
+    const accepts = parsePaymentRequiredAcceptsFromHeader(initialResponse);
+    batchingOption = pickGatewayBatchingOption(accepts, gatewayChain);
+    const raw =
+      initialResponse.headers.get("PAYMENT-REQUIRED") ??
+      initialResponse.headers.get("payment-required");
+    paymentRequired = raw
+      ? (JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as {
+          x402Version?: number;
+          resource?: unknown;
+        })
+      : { x402Version: 2 };
+  } else {
+    const catalog = await getDiscoveryCatalogItem(resourceUrl);
+    const catalogAccepts = (catalog?.accepts ?? []) as PaymentRequiredAccept[];
+    batchingOption = pickGatewayBatchingOption(catalogAccepts, gatewayChain);
+    if (!batchingOption) {
+      const data = parseResponseBody(initialText);
+      if (!initialResponse.ok) {
+        throw new CircleServiceError(
+          `Gateway preflight failed (${initialResponse.status}): ${initialText.slice(0, 500)}`,
+          "SETTLEMENT_FAILED",
+        );
+      }
+      return { status: initialResponse.status, data };
     }
-    return { status: initialResponse.status, data };
-  }
-
-  const accepts = parsePaymentRequiredAcceptsFromHeader(initialResponse);
-  const expectedNetwork = gatewayChain === "polygon" ? "eip155:137" : "eip155:8453";
-  const batchingOption = accepts.find((opt) => {
-    const extra = opt.extra as Record<string, unknown> | undefined;
-    return (
-      opt.network === expectedNetwork &&
-      extra?.name === "GatewayWalletBatched" &&
-      extra?.version === "1"
+    console.info(
+      `[x402] Discovery catalog Gateway pay (${initialResponse.status} from ${new URL(resourceUrl).hostname})`,
     );
-  });
+    paymentRequired = {
+      x402Version: (catalog as { x402Version?: number } | undefined)?.x402Version ?? 2,
+      resource: { url: resourceUrl },
+      accepts: catalogAccepts,
+    };
+  }
 
   if (!batchingOption) {
     throw new CircleServiceError(
-      `No GatewayWalletBatched option for ${expectedNetwork} in PAYMENT-REQUIRED`,
+      `No GatewayWalletBatched option for ${expectedNetworkForGatewayChain(gatewayChain)}`,
       "SETTLEMENT_FAILED",
     );
   }
-
-  const raw = initialResponse.headers.get("PAYMENT-REQUIRED") ?? initialResponse.headers.get("payment-required");
-  const paymentRequired = raw
-    ? (JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as {
-        x402Version?: number;
-        resource?: unknown;
-      })
-    : { x402Version: 2 };
 
   const paymentPayload = await (gateway as unknown as {
     createPaymentPayload: (
@@ -299,7 +390,7 @@ async function payViaGateway(
         ? JSON.stringify(paidData).slice(0, 800)
         : paidText.slice(0, 800);
     throw new CircleServiceError(
-      `Gateway payment failed (${paidResponse.status}) on ${expectedNetwork}: ${detail}`,
+      `Gateway payment failed (${paidResponse.status}) on ${expectedNetworkForGatewayChain(gatewayChain)}: ${detail}`,
       "SETTLEMENT_FAILED",
     );
   }
@@ -313,6 +404,10 @@ async function payViaExactEvm(
   minUsdc: number,
   init?: X402PayRequestInit,
 ): Promise<X402PayResult> {
+  if (chainId === 8453) {
+    await ensureMasterWalletUsdcOnBase(minUsdc);
+  }
+
   const env = getServerEnv();
   const account = privateKeyToAccount(env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`);
 

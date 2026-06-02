@@ -1,6 +1,12 @@
 {
-  "name": "tanstack_start_ts",
-  "private": true,
+  "name": "nano-agent",
+  "private": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/phucrhm15/bookanai.git"
+  },
+  "homepage": "https://github.com/phucrhm15/bookanai#readme",
   "sideEffects": false,
   "type": "module",
   "engines": {

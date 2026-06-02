@@ -1,6 +1,16 @@
 # Nano.Agent (BookanAI)
 
-Ứng dụng web cho phép **nhiều user** đăng ký (Clerk), nạp **USDC trên Base**, gọi agent **Messari** / **Perplexity** qua **x402**, và xem preview thread X.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)](package.json)
+
+Open-source web studio: users sign in with **Clerk**, top up **USDC (Base)**, run **x402 AI agents** (Messari, Perplexity, Surf), and preview **X threads**. Built with **TanStack Start**, **Circle** embedded wallets, and **Circle Gateway** batching.
+
+**Live demo:** https://bookanai.onrender.com  
+**Repo:** https://github.com/phucrhm15/bookanai
+
+---
+
+Ứng dụng web cho phép **nhiều user** đăng ký (Clerk), nạp **USDC trên Base**, gọi agent **Messari** / **Perplexity** / **Surf** qua **x402**, và xem preview thread X.
 
 ## Tính năng
 
@@ -17,9 +27,9 @@
 |---------|----------|
 | [Clerk](https://clerk.com) | Đăng ký / đăng nhập user |
 | [Circle](https://developers.circle.com) | API key, entity secret, wallet set |
-| Ví **Master** (`MASTER_AGENT_PRIVATE_KEY`) | Trả API x402 cho mọi user — **phải có USDC + ETH gas trên Base** |
+| Ví **Master** (`MASTER_AGENT_PRIVATE_KEY`) | Trả API x402 — **Gateway USDC + gas theo chain agent** (Base: Messari; **Polygon: Surf**) |
 | `CIRCLE_KIT_KEY` (tùy chọn) | Bật **Swap** trong App Kit trên trang Wallet |
-| RPC Base | `BASE_RPC_URL` |
+| RPC | `BASE_RPC_URL`, `POLYGON_RPC_URL` (**HTTPS only**, not `wss://`) |
 
 ## Cài đặt local (dev)
 
@@ -43,17 +53,20 @@ Mở http://localhost:8080 (hoặc port Vite in ra).
 2. **Wallet & Billing** → copy địa chỉ ví → nạp **USDC Base**
 3. **Marketplace** → chọn agent → **Studio** → Run Agent
 
-| Agent | Prompt phù hợp | Giá x402 (ước) |
-|-------|----------------|----------------|
-| Perplexity Search Writer | Tin vĩ mô, chính trị | ~0.012 USDC |
-| Messari Token Analyst | Giá / ATH BTC, ETH | ~0.1 USDC |
+| Agent | Prompt phù hợp | Giá x402 (ước) | Chain |
+|-------|----------------|----------------|-------|
+| Perplexity Search Writer | Tin vĩ mô, chính trị | ~0.012 USDC | Base |
+| Messari Token Analyst | Giá / ATH BTC, ETH | ~0.1 USDC | Base |
+| Surf Tokenomics | Tokenomics + unlock | ~0.002 USDC | Polygon Gateway |
 
 ### Vận hành Master (admin)
 
 ```bash
 npm run show:x402          # địa chỉ nạp USDC + ETH cho x402
 npm run gateway:status
-npm run gateway:deposit -- 0.05   # chỉ khi ví EOA đủ USDC
+npm run gateway:deposit -- 0.05 base
+npm run gateway:deposit -- 0.05 polygon   # Surf — cần MATIC gas
+npm run gateway:status -- polygon
 npm run health
 npm run cron:settle        # chuyển user→master on-chain (hoặc cron HTTP)
 ```
@@ -139,6 +152,14 @@ Authorization: Bearer <SETTLEMENT_CRON_SECRET>
 - `MASTER_AGENT_PRIVATE_KEY` chỉ trên server
 - Mỗi user chỉ truy cập ví của mình (Clerk session + `userWalletId` check)
 
+## Open source
+
+- **License:** [MIT](./LICENSE)
+- **Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md)
+- **Security:** [SECURITY.md](./SECURITY.md)
+
+Fork and deploy with your own Circle + Clerk accounts. Do not use production keys from any public demo.
+
 ## License
 
-Private — cấu hình Circle/Clerk theo tài khoản của bạn.
+[MIT](./LICENSE) — Circle, Clerk, and third-party APIs remain subject to their own terms.

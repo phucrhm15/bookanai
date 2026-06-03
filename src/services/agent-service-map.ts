@@ -30,8 +30,10 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
 
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
 export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> = {
+  "perplexity-social": 0.012,
   "surf-news": 0.001,
   "surf-tokenomics": 0.0019,
+  "messari-analyst": 0.1,
 };
 
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */

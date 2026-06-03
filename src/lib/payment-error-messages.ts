@@ -16,8 +16,10 @@ const MESSARI_WALLET_USDC_RE =
   /thiếu USDC on-chain trên Base|USDC on-chain on Base/i;
 const RPC_AUTH_RE =
   /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
-const MARKET_TIMEOUT_RE =
+const   MARKET_TIMEOUT_RE =
   /AI Agent Marketplace did not respond within|did not respond within \d+ms|TIMEOUT/i;
+const PROBE_HTTP_RE =
+  /Agent không phát hành x402 402|Probe x402|HTTP 502|HTTP 503|HTTP 504|Discovery metadata/i;
 const POLYGON_CONTEXT_RE = /polygon|eip155:137|surf|nano\.blockrun/i;
 
 function spendableLooksZero(message: string): boolean {
@@ -104,6 +106,12 @@ export function formatPaymentErrorForUser(
       "Admin: set POLYGON_RPC_URL=https://polygon.llamarpc.com on Render, redeploy, " +
       "and ensure the master wallet has Gateway USDC on Polygon plus MATIC for gas."
     );
+  }
+
+  if (PROBE_HTTP_RE.test(message)) {
+    return locale === "vi"
+      ? "Marketplace phản hồi lỗi hoặc chưa trả HTTP 402. App đã thử lấy giá từ catalog Circle — thử lại sau vài giây hoặc dùng Surf (đang hoạt động)."
+      : "Marketplace returned an error or no HTTP 402. The app falls back to the Circle catalog price — retry in a few seconds or use Surf (currently working).";
   }
 
   if (MARKET_TIMEOUT_RE.test(message)) {

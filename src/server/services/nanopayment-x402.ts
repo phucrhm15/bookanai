@@ -182,12 +182,22 @@ export async function processNanopaymentX402(
   const resourceUrl = withAgentResourceQuery(agentServiceId, mappedUrl, prompt);
   console.info(`[x402] Discovery resource for ${agentServiceId}: ${resourceUrl}`);
 
+  const payOptions = payOptionsForAgent(agentServiceId, prompt);
+  const probeInit = payOptions
+    ? {
+        method: payOptions.method,
+        headers: payOptions.headers,
+        body: payOptions.body,
+      }
+    : undefined;
+
   let probe;
   try {
     probe = await probeX402ResourcePrice(
       mappedUrl,
       targetChainId,
       discoveryItem.accepts,
+      probeInit,
     );
   } catch (probeError) {
     const fallback = STUDIO_AGENT_FALLBACK_PRICE_USDC[agentServiceId];

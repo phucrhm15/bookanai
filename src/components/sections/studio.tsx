@@ -109,7 +109,7 @@ export function Studio() {
     toast.success(t("studio.charged", { amount: payment?.chargedUsdc ?? activeAgent.price }), {
       description: payment
         ? t("studio.chargedDescLedger", {
-            balance: payment.ledgerBalance.toFixed(2),
+            balance: payment.ledgerBalance.toFixed(4),
             settlement,
           })
         : `Paid via x402 on ${BASE_NETWORK.name}`,

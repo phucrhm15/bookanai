@@ -147,7 +147,7 @@ function BalanceCard({
             ) : (
               <>
                 <span className="font-display text-5xl font-bold tracking-tight">
-                  ${balance.toFixed(2)}
+                  ${settlementHold > 0.000_001 ? balance.toFixed(4) : balance.toFixed(2)}
                 </span>
                 <span className="font-mono text-sm text-primary">USDC</span>
               </>

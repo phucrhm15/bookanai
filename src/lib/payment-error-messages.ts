@@ -1,8 +1,10 @@
 import type { Locale } from "@/lib/i18n/types";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
-const MASTER_USDC_RE =
-  /Ví Master thiếu USDC|Circle Gateway thiếu USDC|Gateway thiếu USDC|Master wallet|Circle Gateway/i;
+const MASTER_GATEWAY_USDC_RE =
+  /Circle Gateway thiếu USDC|Gateway thiếu USDC/i;
+const MASTER_ONCHAIN_BASE_RE =
+  /thiếu USDC on-chain trên Base|USDC on-chain on Base|x402 exact|khác với npm run gateway:deposit/i;
 const USER_USDC_RE =
   /Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient USDC|khả dụng|Insufficient balance|Content Credits/i;
 const GAS_RE =
@@ -12,8 +14,6 @@ const NETWORK_SCHEME_RE =
 const PAYMENT_VERIFY_RE =
   /Payment verification failed|payment verification failed|x402 verify failed/i;
 const AISA_API_KEY_RE = /invalid api key/i;
-const MESSARI_WALLET_USDC_RE =
-  /thiếu USDC on-chain trên Base|USDC on-chain on Base/i;
 const RPC_AUTH_RE =
   /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
 const   MARKET_TIMEOUT_RE =
@@ -47,7 +47,27 @@ export function formatPaymentErrorForUser(
       : "Payment failed. Please try again.";
   }
 
-  if (MASTER_USDC_RE.test(message)) {
+  if (MASTER_ONCHAIN_BASE_RE.test(message)) {
+    const addr = extractAddress(message);
+    if (locale === "vi") {
+      return (
+        "Web Search / Messari trả API bằng x402 exact trên Base — ví master server cần USDC **on-chain** (~0.007–0.1 USDC/lần), " +
+        "không phải Content Credits của bạn và **không** dùng npm run gateway:deposit. " +
+        (addr
+          ? `Admin: chuyển ≥0.02 USDC (mạng Base) vào ${addr} · npm run show:x402`
+          : "Admin: npm run show:x402 → nạp USDC trực tiếp trên Base.")
+      );
+    }
+    return (
+      "Web Search / Messari pay via exact x402 on Base — the server master wallet needs **on-chain** USDC (~0.007–0.1/call), " +
+      "not your Content Credits and **not** npm run gateway:deposit. " +
+      (addr
+        ? `Admin: send ≥0.02 USDC on Base to ${addr} · npm run show:x402`
+        : "Admin: npm run show:x402 → fund USDC directly on Base.")
+    );
+  }
+
+  if (MASTER_GATEWAY_USDC_RE.test(message) || /Master wallet|Ví Master thiếu USDC/i.test(message)) {
     const addr = extractAddress(message);
     const needsPolygon = POLYGON_CONTEXT_RE.test(message);
     if (locale === "vi") {
@@ -127,19 +147,6 @@ export function formatPaymentErrorForUser(
       : "Marketplace responded slower than expected. Retry in 5-10 seconds. If it keeps happening, use Surf first or try a shorter prompt.";
   }
 
-  if (MESSARI_WALLET_USDC_RE.test(message)) {
-    if (locale === "vi") {
-      return (
-        "Messari dùng x402 exact trên Base — cần USDC trong ví master on-chain (~0.1 USDC/lần), " +
-        "không chỉ trong Circle Gateway. Admin: npm run show:x402 → nạp USDC (Base) vào địa chỉ in ra."
-      );
-    }
-    return (
-      "Messari uses exact x402 on Base — the master wallet needs on-chain USDC (~0.1 USDC/call), " +
-      "not only Circle Gateway balance. Admin: npm run show:x402 → fund USDC on Base at the printed address."
-    );
-  }
-
   if (AISA_API_KEY_RE.test(message)) {
     if (locale === "vi") {
       return (
@@ -183,7 +190,7 @@ export function formatPaymentErrorForUser(
     );
   }
 
-  if (USER_USDC_RE.test(message) && !MASTER_USDC_RE.test(message)) {
+  if (USER_USDC_RE.test(message) && !MASTER_GATEWAY_USDC_RE.test(message) && !MASTER_ONCHAIN_BASE_RE.test(message)) {
     const holdMatch = message.match(/đang giữ chuyển ([\d.]+)|hold ([\d.]+)/i);
     const ledgerMatch = message.match(/ledger ([\d.]+)/i);
     const onChainMatch = message.match(/ví on-chain ([\d.]+)|on-chain ([\d.]+)/i);

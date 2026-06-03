@@ -150,7 +150,7 @@ async function ensureMasterWalletUsdcOnBase(minUsdc: number): Promise<void> {
   if (walletUsdc + 1e-9 < minUsdc) {
     const depositor = masterDepositorAddress();
     throw new CircleServiceError(
-      `Ví master thiếu USDC on-chain trên Base (${walletUsdc.toFixed(6)} < ${minUsdc} USDC) cho x402 exact (Messari). ` +
+      `Ví master thiếu USDC on-chain trên Base (${walletUsdc.toFixed(6)} < ${minUsdc} USDC) cho x402 exact (Web Search / Messari). ` +
         `Nạp USDC trực tiếp vào ${depositor} trên Base — khác với npm run gateway:deposit.`,
       "INSUFFICIENT_BALANCE",
     );

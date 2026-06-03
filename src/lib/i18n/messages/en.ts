@@ -255,9 +255,15 @@ export const en = {
   },
   hints: {
     messariMismatch:
-      "This prompt looks like macro news — use **Perplexity Search Writer** (~0.01 USDC). Messari only returns token ATH/price (~0.1 USDC), not long articles.",
+      "This prompt looks like macro news — use **Web Search Writer** (~0.007 USDC). Messari only returns token ATH/price (~0.1 USDC), not long articles.",
     perplexityMismatch:
       "This prompt looks like market data — try **Messari Token Analyst** for on-chain ATH/price.",
+    surfNewsNoPrompt:
+      "Surf Crypto News returns a **fixed news feed** from the API — your prompt **does not change** the result. For Q&A, use **Web Search Writer**.",
+    surfTokenomicsPartial:
+      "Surf Tokenomics only reads a **token symbol** from your prompt (API ?symbol=). Will query **{{symbol}}** — not full natural-language analysis.",
+    messariPartial:
+      "Messari only fetches **BTC / ETH / SOL** metrics (ATH, price, volume) from keywords — not a full answer to your question.",
   },
   meta: {
     homeTitle: "Nano.Agent — x402 AI agents paid with USDC",

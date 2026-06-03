@@ -205,6 +205,26 @@ function formatPerplexityData(data: unknown, t: TFn): string {
     }
   }
 
+  const searchResults = root.results;
+  if (Array.isArray(searchResults)) {
+    const lines = searchResults
+      .slice(0, 8)
+      .map((item) => asRecord(item))
+      .filter((item): item is JsonRecord => Boolean(item))
+      .map((item) => {
+        const title = pickString(item, ["title", "headline", "name"]);
+        const desc =
+          pickString(item, ["text", "summary", "snippet", "description"]) ??
+          (Array.isArray(item.highlights) ? String(item.highlights[0] ?? "") : undefined);
+        const url = pickString(item, ["url", "link"]);
+        const lead = title ? `• ${title}` : "• Result";
+        const detail = desc ? `\n  ${desc.slice(0, 280)}` : "";
+        const link = url ? `\n  ${url}` : "";
+        return `${lead}${detail}${link}`;
+      });
+    if (lines.length) return `${header}\n${lines.join("\n")}`;
+  }
+
   const dataObj = asRecord(root.data);
   if (dataObj) {
     const nested = pickString(dataObj, ["text", "content", "answer"]);

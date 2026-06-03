@@ -26,15 +26,15 @@ export const AGENTS: Agent[] = [
   },
   {
     id: "perplexity-social",
-    name: "Perplexity Search Writer",
-    handle: "@perplexity_macro",
+    name: "Web Search Writer",
+    handle: "@exa_search",
     category: "Search & News",
-    price: 0.008,
+    price: 0.007,
     description:
-      "Macro & political news, long X threads (~0.01 USDC/call). Prompt in English or Vietnamese.",
+      "Web search theo prompt qua Exa (~0.007 USDC/call). Tìm tin, dự án, token — prompt tiếng Việt/Anh.",
     emoji: "🌍",
     accent: "magenta",
-    baseUrl: "https://api.aisa.one",
+    baseUrl: "https://api.exa.ai",
   },
   {
     id: "surf-news",

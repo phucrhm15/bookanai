@@ -16,6 +16,63 @@ export function isMarketDataPrompt(prompt: string): boolean {
   return MARKET_DATA_RE.test(prompt);
 }
 
+export type AgentPromptBehavior = {
+  /** full = prompt gửi nguyên văn tới API; partial = chỉ một phần; none = API bỏ qua prompt */
+  mode: "full" | "partial" | "none";
+  info?: string;
+};
+
+export function agentPromptBehavior(
+  agentId: string,
+  prompt: string,
+  locale: Locale = DEFAULT_LOCALE,
+): AgentPromptBehavior {
+  if (agentId === "surf-news") {
+    return {
+      mode: "none",
+      info: translate(locale, "hints.surfNewsNoPrompt"),
+    };
+  }
+
+  if (agentId === "surf-tokenomics") {
+    const symbol = inferSymbolHint(prompt);
+    return {
+      mode: "partial",
+      info: translate(locale, "hints.surfTokenomicsPartial", { symbol }),
+    };
+  }
+
+  if (agentId === "messari-analyst") {
+    return {
+      mode: "partial",
+      info: translate(locale, "hints.messariPartial"),
+    };
+  }
+
+  if (agentId === "perplexity-social") {
+    return { mode: "full" };
+  }
+
+  return { mode: "full" };
+}
+
+/** Rough symbol for Surf tokenomics hint (mirrors server inferSurfSymbol). */
+function inferSymbolHint(prompt: string): string {
+  const text = prompt.toUpperCase();
+  const fromDollar = text.match(/\$([A-Z0-9]{2,12})\b/);
+  if (fromDollar?.[1]) return fromDollar[1];
+  const candidates = text.match(/\b[A-Z]{2,12}\b/g) ?? [];
+  for (const token of candidates) {
+    if (!["API", "JSON", "HTTP", "USDC", "BASE", "X", "THREAD", "BTC", "ETH", "SOL"].includes(token)) {
+      return token;
+    }
+  }
+  if (/\bBTC\b|\bBITCOIN\b/i.test(prompt)) return "BTC";
+  if (/\bETH\b|\bETHEREUM\b/i.test(prompt)) return "ETH";
+  if (/\bSOL\b|\bSOLANA\b/i.test(prompt)) return "SOL";
+  return "AAVE";
+}
+
 export function agentPromptMismatch(
   agentId: string,
   prompt: string,

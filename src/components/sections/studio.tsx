@@ -10,7 +10,7 @@ import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import { TweetThreadPreview } from "@/components/TweetThreadPreview";
 import { BASE_CHAIN_ID, BASE_NETWORK } from "@/lib/chains";
 import { postNanopayment } from "@/lib/wallet-api";
-import { agentPromptMismatch } from "@/lib/agent-prompt-hints";
+import { agentPromptBehavior, agentPromptMismatch } from "@/lib/agent-prompt-hints";
 import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
 import { translate } from "@/lib/i18n/translate";
 import { useTranslation } from "@/lib/i18n/locale-context";
@@ -44,6 +44,7 @@ export function Studio() {
   }, [activeAgent.id, t]);
 
   const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
+  const promptBehavior = agentPromptBehavior(activeAgent.id, prompt, locale);
 
   const run = async () => {
     if (!prompt.trim()) {
@@ -166,6 +167,11 @@ export function Studio() {
               className="resize-none border-border/60 bg-background/60 font-mono text-sm"
               disabled={loading}
             />
+            {promptBehavior.info ? (
+              <p className="mt-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                {promptBehavior.info}
+              </p>
+            ) : null}
             {promptMismatch.warn && promptMismatch.message ? (
               <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
                 {promptMismatch.message}

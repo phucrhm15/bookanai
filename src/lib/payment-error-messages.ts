@@ -19,7 +19,8 @@ const RPC_AUTH_RE =
 const   MARKET_TIMEOUT_RE =
   /AI Agent Marketplace did not respond within|did not respond within \d+ms|TIMEOUT/i;
 const PROBE_HTTP_RE =
-  /Agent không phát hành x402 402|Probe x402|HTTP 502|HTTP 503|HTTP 504|Discovery metadata/i;
+  /Agent không phát hành x402 402|Probe x402 marketplace|không có giá trong Discovery metadata/i;
+const UPSTREAM_502_RE = /HTTP 502|HTTP 503|Bad gateway|error-502/i;
 const POLYGON_CONTEXT_RE = /polygon|eip155:137|surf|nano\.blockrun/i;
 
 function spendableLooksZero(message: string): boolean {
@@ -106,6 +107,12 @@ export function formatPaymentErrorForUser(
       "Admin: set POLYGON_RPC_URL=https://polygon.llamarpc.com on Render, redeploy, " +
       "and ensure the master wallet has Gateway USDC on Polygon plus MATIC for gas."
     );
+  }
+
+  if (UPSTREAM_502_RE.test(message) && /sau thanh toán x402|after x402 payment/i.test(message)) {
+    return locale === "vi"
+      ? "API marketplace phản hồi lỗi 502/503 sau khi trả tiền x402 (server nhà cung cấp quá tải). Content Credits đã hoàn — thử lại sau 1–2 phút."
+      : "Marketplace API returned 502/503 after x402 payment (provider overload). Credits refunded — retry in 1–2 minutes.";
   }
 
   if (PROBE_HTTP_RE.test(message)) {

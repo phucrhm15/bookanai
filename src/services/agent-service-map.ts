@@ -23,21 +23,22 @@ type DiscoveryResponse = {
 export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   /** Messari x402 — /details returns 403 after pay; /ath works with exact EIP-3009 */
   "messari-analyst": "https://api.messari.io/metrics/v2/assets/ath",
-  "perplexity-social": "https://api.aisa.one/apis/v2/perplexity/sonar",
+  /** Exa web search — AIsa Perplexity removed from Circle Discovery (2026) */
+  "perplexity-social": "https://api.exa.ai/search",
   "surf-news": "https://nano.blockrun.ai/api/v1/surf/news/feed",
   "surf-tokenomics": "https://nano.blockrun.ai/api/v1/surf/token/tokenomics",
 };
 
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
 export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> = {
-  "perplexity-social": 0.012,
+  "perplexity-social": 0.007,
   "surf-news": 0.001,
   "surf-tokenomics": 0.0019,
   "messari-analyst": 0.1,
 };
 
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
-const DIRECT_X402_HOSTS = new Set(["api.messari.io", "nano.blockrun.ai"]);
+const DIRECT_X402_HOSTS = new Set(["api.messari.io", "nano.blockrun.ai", "api.exa.ai"]);
 
 /** All HTTPS hosts from STUDIO_AGENT_RESOURCES (+ DIRECT_X402_HOSTS). */
 function studioAllowlistedHosts(): Set<string> {

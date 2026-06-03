@@ -27,7 +27,7 @@ const opts = payOptionsForAgent(agent, "BTC price today?");
 console.log("paying", agent, url, opts);
 
 try {
-  const res = await payX402Resource(url, BASE_CHAIN_ID, agent === "messari-analyst" ? 0.1 : 0.012, opts);
+  const res = await payX402Resource(url, BASE_CHAIN_ID, agent === "messari-analyst" ? 0.1 : 0.007, opts);
   console.log("OK status", res.status, JSON.stringify(res.data).slice(0, 400));
 } catch (e) {
   console.error("FAIL", e);

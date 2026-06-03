@@ -102,19 +102,10 @@ export function payOptionsForAgent(
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: {
-        model: "sonar",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a crypto macro analyst writing for X (Twitter) in Vietnamese. " +
-              "Respond with a structured thread: 6–10 bullet points, **bold** section titles, " +
-              "150–300 words total. Cite recent news; avoid one-line answers.",
-          },
-          { role: "user", content: prompt.trim() },
-        ],
-        search_recency_filter: "week",
-        max_tokens: 1024,
+        query: prompt.trim(),
+        type: "auto",
+        numResults: 8,
+        contents: { text: { maxCharacters: 800 }, highlights: { numSentences: 2 } },
       },
     };
   }

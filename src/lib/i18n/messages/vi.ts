@@ -259,9 +259,15 @@ export const vi: typeof en = {
   },
   hints: {
     messariMismatch:
-      "Prompt này giống tin vĩ mô — hãy chọn **Perplexity Search Writer** (~0.01 USDC). Messari chỉ trả giá/ATH token (~0.1 USDC), không viết bài dài.",
+      "Prompt này giống tin vĩ mô — hãy chọn **Web Search Writer** (~0.007 USDC). Messari chỉ trả giá/ATH token (~0.1 USDC), không viết bài dài.",
     perplexityMismatch:
       "Prompt này giống dữ liệu thị trường — có thể dùng **Messari Token Analyst** cho ATH/giá on-chain.",
+    surfNewsNoPrompt:
+      "Surf Crypto News trả **feed tin cố định** từ API — ô prompt **không ảnh hưởng** kết quả. Cần trả lời theo câu hỏi? Chọn **Web Search Writer**.",
+    surfTokenomicsPartial:
+      "Surf Tokenomics chỉ đọc **mã token** trong prompt (API ?symbol=). Sẽ gọi symbol **{{symbol}}** — không phải phân tích câu văn đầy đủ.",
+    messariPartial:
+      "Messari chỉ lấy **BTC / ETH / SOL** (ATH, giá, volume) theo từ khóa trong prompt — không viết bài phân tích theo câu hỏi.",
   },
   meta: {
     homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",

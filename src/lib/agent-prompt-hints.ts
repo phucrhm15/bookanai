@@ -22,16 +22,56 @@ export type AgentPromptBehavior = {
   info?: string;
 };
 
+export type AgentStudioInput = {
+  showPrompt: boolean;
+  /** Mô tả agent khi không có ô prompt */
+  agentNote?: string;
+  /** Placeholder mẫu trong ô prompt */
+  promptPlaceholder?: string;
+  /** Gợi ý dưới ô prompt (partial / full) */
+  promptHint?: string;
+};
+
+const PROMPT_PLACEHOLDER_KEYS: Partial<Record<string, string>> = {
+  "messari-analyst": "studio.defaultPromptMessari",
+  "perplexity-social": "studio.defaultPromptPerplexity",
+  "surf-tokenomics": "studio.defaultPromptSurfTokenomics",
+};
+
+const AGENT_NOTE_KEYS: Partial<Record<string, string>> = {
+  "surf-news": "studio.agentNoteSurfNews",
+};
+
+export function getAgentStudioInput(
+  agentId: string,
+  prompt: string,
+  locale: Locale = DEFAULT_LOCALE,
+): AgentStudioInput {
+  const behavior = agentPromptBehavior(agentId, prompt, locale);
+
+  if (behavior.mode === "none") {
+    const noteKey = AGENT_NOTE_KEYS[agentId];
+    return {
+      showPrompt: false,
+      agentNote: noteKey ? translate(locale, noteKey) : behavior.info,
+    };
+  }
+
+  const placeholderKey = PROMPT_PLACEHOLDER_KEYS[agentId];
+  return {
+    showPrompt: true,
+    promptPlaceholder: placeholderKey ? translate(locale, placeholderKey) : undefined,
+    promptHint: behavior.info,
+  };
+}
+
 export function agentPromptBehavior(
   agentId: string,
   prompt: string,
   locale: Locale = DEFAULT_LOCALE,
 ): AgentPromptBehavior {
   if (agentId === "surf-news") {
-    return {
-      mode: "none",
-      info: translate(locale, "hints.surfNewsNoPrompt"),
-    };
+    return { mode: "none" };
   }
 
   if (agentId === "surf-tokenomics") {

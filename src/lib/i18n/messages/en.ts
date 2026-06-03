@@ -97,6 +97,9 @@ export const en = {
     defaultPromptSurf: "Give me the top crypto headlines today and why they matter.",
     defaultPromptSurfTokenomics:
       "Analyze tokenomics for BTC, ETH, and SOL: supply structure, unlock pressure, and key risks.",
+    promptLabel: "Your prompt",
+    agentNoteSurfNews:
+      "Surf Crypto News returns an **AI-curated crypto headline feed** (~0.001 USDC/run). No prompt needed — click Run Agent for the latest headlines from Surf (nano.blockrun.ai). For custom search queries, use **Web Search Writer**.",
     promptEmpty: "Add a prompt first",
     promptMismatchTitle: "This agent may not match your prompt",
     paymentFailed: "Payment failed",

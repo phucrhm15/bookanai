@@ -6,11 +6,14 @@ import { useActiveAgent } from "@/lib/agent-store";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Wand2 } from "lucide-react";
+import { Info, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { TweetThreadPreview } from "@/components/TweetThreadPreview";
 import { BASE_CHAIN_ID, BASE_NETWORK } from "@/lib/chains";
 import { postNanopayment } from "@/lib/wallet-api";
-import { agentPromptBehavior, agentPromptMismatch } from "@/lib/agent-prompt-hints";
+import {
+  agentPromptMismatch,
+  getAgentStudioInput,
+} from "@/lib/agent-prompt-hints";
 import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
 import { translate } from "@/lib/i18n/translate";
 import { useTranslation } from "@/lib/i18n/locale-context";
@@ -25,29 +28,22 @@ export function Studio() {
   const { data: wallet } = useWallet();
   const { t, locale } = useTranslation();
 
-  const defaultPromptForAgent = (agentId: string): string => {
-    if (agentId === "messari-analyst") return t("studio.defaultPromptMessari");
-    if (agentId === "surf-news") return t("studio.defaultPromptSurf");
-    if (agentId === "surf-tokenomics") return t("studio.defaultPromptSurfTokenomics");
-    return t("studio.defaultPromptPerplexity");
-  };
-
-  const defaultPrompt = defaultPromptForAgent(activeAgent.id);
-
-  const [prompt, setPrompt] = useState(defaultPrompt);
+  const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<GenState>("idle");
   const [rawResponse, setRawResponse] = useState<string | null>(null);
   const payInFlight = useRef(false);
 
-  useEffect(() => {
-    setPrompt(defaultPromptForAgent(activeAgent.id));
-  }, [activeAgent.id, t]);
-
+  const studioInput = getAgentStudioInput(activeAgent.id, prompt, locale);
   const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
-  const promptBehavior = agentPromptBehavior(activeAgent.id, prompt, locale);
+
+  useEffect(() => {
+    setPrompt("");
+    setRawResponse(null);
+    setState("idle");
+  }, [activeAgent.id]);
 
   const run = async () => {
-    if (!prompt.trim()) {
+    if (studioInput.showPrompt && !prompt.trim()) {
       toast.error(t("studio.promptEmpty"));
       return;
     }
@@ -67,6 +63,8 @@ export function Studio() {
         ? crypto.randomUUID()
         : `pay-${Date.now()}`;
 
+    const promptForApi = studioInput.showPrompt ? prompt.trim() : undefined;
+
     let payment: Awaited<ReturnType<typeof postNanopayment>> | undefined;
     try {
       if (!wallet?.walletId) {
@@ -78,7 +76,7 @@ export function Studio() {
         wallet.walletId,
         activeAgent.id,
         chainId,
-        prompt.trim(),
+        promptForApi,
         idempotencyKey,
       );
       await queryClient.invalidateQueries({ queryKey: walletQueryKey(userId) });
@@ -159,24 +157,45 @@ export function Studio() {
               </Badge>
             </div>
 
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={defaultPrompt}
-              rows={7}
-              className="resize-none border-border/60 bg-background/60 font-mono text-sm"
-              disabled={loading}
-            />
-            {promptBehavior.info ? (
-              <p className="mt-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                {promptBehavior.info}
-              </p>
-            ) : null}
-            {promptMismatch.warn && promptMismatch.message ? (
-              <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                {promptMismatch.message}
-              </p>
-            ) : null}
+            {studioInput.showPrompt ? (
+              <div className="space-y-2">
+                <label
+                  htmlFor="studio-prompt"
+                  className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                >
+                  {t("studio.promptLabel")}
+                </label>
+                <Textarea
+                  id="studio-prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={studioInput.promptPlaceholder}
+                  rows={7}
+                  className="resize-none border-border/60 bg-background/60 font-mono text-sm"
+                  disabled={loading}
+                />
+                {studioInput.promptHint ? (
+                  <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                    {studioInput.promptHint}
+                  </p>
+                ) : null}
+                {promptMismatch.warn && promptMismatch.message ? (
+                  <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                    {promptMismatch.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/60 bg-background/50 px-4 py-4">
+                <div className="mb-2 flex items-center gap-2 text-primary">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-semibold">{activeAgent.name}</span>
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {studioInput.agentNote ?? activeAgent.description}
+                </p>
+              </div>
+            )}
 
             <div className="mt-4 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">

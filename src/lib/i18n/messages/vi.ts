@@ -100,6 +100,9 @@ export const vi: typeof en = {
     defaultPromptSurf: "Cho tôi các headline crypto nổi bật hôm nay và vì sao quan trọng.",
     defaultPromptSurfTokenomics:
       "Phân tích tokenomics BTC, ETH, SOL: cấu trúc nguồn cung, áp lực unlock và rủi ro chính.",
+    promptLabel: "Prompt của bạn",
+    agentNoteSurfNews:
+      "Surf Crypto News trả **feed tin crypto được AI chọn lọc** (~0.001 USDC/lần). Không cần nhập prompt — bấm Chạy Agent để lấy headline mới nhất từ Surf (nano.blockrun.ai). Muốn tìm kiếm theo câu hỏi? Chọn **Web Search Writer**.",
     promptEmpty: "Nhập prompt trước",
     promptMismatchTitle: "Agent có thể không phù hợp prompt",
     paymentFailed: "Thanh toán thất bại",

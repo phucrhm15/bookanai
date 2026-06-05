@@ -32,12 +32,21 @@ export type AgentStudioInput = {
   promptHint?: string;
 };
 
-const PROMPT_PLACEHOLDER_KEYS: Partial<Record<string, string>> = {
+const DEFAULT_PROMPT_KEYS: Partial<Record<string, string>> = {
   "messari-analyst": "studio.defaultPromptMessari",
   "perplexity-social": "studio.defaultPromptPerplexity",
   "surf-tokenomics": "studio.defaultPromptSurfTokenomics",
   "crypto-research-b": "studio.defaultPromptStackB",
 };
+
+/** Pre-filled Studio prompt (user can edit or replace). */
+export function defaultPromptForAgent(
+  agentId: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  const key = DEFAULT_PROMPT_KEYS[agentId];
+  return key ? translate(locale, key) : "";
+}
 
 const AGENT_NOTE_KEYS: Partial<Record<string, string>> = {
   "surf-news": "studio.agentNoteSurfNews",
@@ -58,7 +67,7 @@ export function getAgentStudioInput(
     };
   }
 
-  const placeholderKey = PROMPT_PLACEHOLDER_KEYS[agentId];
+  const placeholderKey = DEFAULT_PROMPT_KEYS[agentId];
   return {
     showPrompt: true,
     promptPlaceholder: placeholderKey ? translate(locale, placeholderKey) : undefined,

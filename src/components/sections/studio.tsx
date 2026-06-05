@@ -12,6 +12,7 @@ import { BASE_CHAIN_ID, BASE_NETWORK } from "@/lib/chains";
 import { postNanopayment } from "@/lib/wallet-api";
 import {
   agentPromptMismatch,
+  defaultPromptForAgent,
   getAgentStudioInput,
 } from "@/lib/agent-prompt-hints";
 import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
@@ -28,7 +29,7 @@ export function Studio() {
   const { data: wallet } = useWallet();
   const { t, locale } = useTranslation();
 
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(() => defaultPromptForAgent(activeAgent.id, locale));
   const [state, setState] = useState<GenState>("idle");
   const [rawResponse, setRawResponse] = useState<string | null>(null);
   const payInFlight = useRef(false);
@@ -37,10 +38,10 @@ export function Studio() {
   const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
 
   useEffect(() => {
-    setPrompt("");
+    setPrompt(defaultPromptForAgent(activeAgent.id, locale));
     setRawResponse(null);
     setState("idle");
-  }, [activeAgent.id]);
+  }, [activeAgent.id, locale]);
 
   const run = async () => {
     if (studioInput.showPrompt && !prompt.trim()) {
@@ -173,7 +174,6 @@ export function Studio() {
                   id="studio-prompt"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={studioInput.promptPlaceholder}
                   rows={7}
                   className="resize-none border-border/60 bg-background/60 font-mono text-sm"
                   disabled={loading}

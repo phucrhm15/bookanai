@@ -106,7 +106,7 @@ export const vi: typeof en = {
     defaultPromptSurfTokenomics:
       "Phân tích tokenomics BTC, ETH, SOL: cấu trúc nguồn cung, áp lực unlock và rủi ro chính.",
     defaultPromptStackB:
-      "Nghiên cứu top alt (trừ stable/BTC/ETH/BNB/XRP): narrative, fundamentals, yield DeFi, tin ticker.",
+      "Quét alt mid-cap: narrative L1/L2/DeFi, TVL, unlock (LOẠI BTC, ETH, BNB, XRP, stablecoin).",
     promptLabel: "Prompt của bạn",
     agentNoteSurfNews:
       "Surf Crypto News trả **feed tin crypto được AI chọn lọc** (~0.001 USDC/lần). Không cần nhập prompt — bấm Chạy Agent để lấy headline mới nhất từ Surf (nano.blockrun.ai). Muốn tìm kiếm theo câu hỏi? Chọn **Web Search Writer**.",
@@ -279,7 +279,7 @@ export const vi: typeof en = {
     messariPartial:
       "Messari chỉ lấy **BTC / ETH / SOL** (ATH, giá, volume) theo từ khóa trong prompt — không viết bài phân tích theo câu hỏi.",
     stackBFull:
-      "Stack B chạy **6 lần gọi x402** trong một Run (~0.22 USDC): Exa → Messari details → vaults.fyi networks & vaults → Gloria tin ticker ×3 (suy từ prompt).",
+      "Stack B: **chỉ alt** (~0.22 USDC) — Exa narrative → Messari fundamentals → vaults.fyi yield → Gloria tin ×3. **Loại cứng** BTC, ETH, BNB, XRP & stable ở mọi bước.",
   },
   meta: {
     homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",

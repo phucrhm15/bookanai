@@ -1,3 +1,10 @@
+import {
+  filterMessariRow,
+  isExcludedVaultName,
+  isMacroExaResult,
+  isValidAltTicker,
+} from "@/lib/stack-b-exclusions";
+
 export type StackBStepResult = {
   url: string;
   status: number;
@@ -28,95 +35,127 @@ export function isStackBReport(value: unknown): value is StackBReport {
   );
 }
 
-/** Plain-text report for Studio thread preview. */
+function messariRows(data: unknown): Record<string, unknown>[] {
+  const root =
+    data && typeof data === "object" && "data" in (data as object)
+      ? (data as { data: unknown }).data
+      : data;
+  if (!Array.isArray(root)) return [];
+  return root
+    .map((row) => (row && typeof row === "object" ? (row as Record<string, unknown>) : null))
+    .filter((r): r is Record<string, unknown> => r !== null);
+}
+
+function vaultItems(data: unknown): Record<string, unknown>[] {
+  const root = data as { data?: unknown[] } | unknown[];
+  const list = Array.isArray(root) ? root : Array.isArray(root?.data) ? root.data : [];
+  return list
+    .map((v) => (v && typeof v === "object" ? (v as Record<string, unknown>) : null))
+    .filter((r): r is Record<string, unknown> => r !== null);
+}
+
+/** Plain-text alt-only report for Studio thread preview. */
 export function formatStackBForDisplay(report: StackBReport): string {
   const lines: string[] = [
-    "🔬 **CRYPTO RESEARCH — STACK B**",
-    `Prompt: ${report.prompt}`,
+    "🔬 **ALTCOIN RESEARCH — STACK B**",
+    "_Universe: mid-cap alts only · ex BTC, ETH, BNB, XRP & all stables_",
     `~${report.chargedUsdc.toFixed(3)} USDC · Exa + Messari + vaults.fyi + Gloria ×${report.gloriaTickers.length}`,
     "",
-    "🌍 **WEB SEARCH (Exa)**",
+    "🌍 **NARRATIVES (Exa)**",
   ];
 
   const exaRoot =
     report.steps.exa.data && typeof report.steps.exa.data === "object"
       ? (report.steps.exa.data as Record<string, unknown>)
       : null;
-  const exaResults = exaRoot?.results;
-  if (Array.isArray(exaResults) && exaResults.length) {
-    for (const item of exaResults.slice(0, 6)) {
-      if (!item || typeof item !== "object") continue;
-      const row = item as Record<string, unknown>;
-      const title = typeof row.title === "string" ? row.title : "Result";
-      const snippet =
-        typeof row.text === "string"
-          ? row.text.slice(0, 200)
-          : Array.isArray(row.highlights)
-            ? String(row.highlights[0] ?? "").slice(0, 200)
-            : "";
-      lines.push(`• ${title}`);
-      if (snippet) lines.push(`  ${snippet}`);
-    }
-  } else {
-    lines.push("• (no Exa results)");
+  const exaResults = Array.isArray(exaRoot?.results) ? exaRoot!.results : [];
+  let exaShown = 0;
+  for (const item of exaResults) {
+    if (exaShown >= 5) break;
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const title = typeof row.title === "string" ? row.title.trim() : "";
+    const snippet =
+      typeof row.text === "string"
+        ? row.text.slice(0, 220)
+        : Array.isArray(row.highlights)
+          ? String(row.highlights[0] ?? "").slice(0, 220)
+          : "";
+    if (!title || isMacroExaResult(title, snippet)) continue;
+    lines.push(`• ${title}`);
+    if (snippet) lines.push(`  ${snippet}`);
+    exaShown++;
   }
+  if (!exaShown) lines.push("• (no alt-focused narrative hits — try refining prompt)");
 
-  lines.push("", "📊 **MESSARI DETAILS**", `Slugs: ${report.messariSlugs.join(", ")}`);
-  const messariData =
-    report.steps.messari.data &&
-    typeof report.steps.messari.data === "object" &&
-    "data" in (report.steps.messari.data as object)
-      ? (report.steps.messari.data as { data: unknown }).data
-      : report.steps.messari.data;
-  if (Array.isArray(messariData)) {
-    for (const row of messariData.slice(0, 8)) {
-      if (!row || typeof row !== "object") continue;
-      const asset = row as Record<string, unknown>;
-      const sym = String(asset.symbol ?? asset.slug ?? "?").toUpperCase();
+  lines.push("", "📊 **FUNDAMENTALS (Messari)**");
+  const assets = messariRows(report.steps.messari.data).filter(filterMessariRow);
+  if (assets.length) {
+    for (const asset of assets.slice(0, 8)) {
+      const sym = String(asset.symbol ?? "?").toUpperCase();
       const name = typeof asset.name === "string" ? asset.name : sym;
       const rank = asset.rank != null ? `#${asset.rank}` : "";
-      lines.push(`• **${sym}** ${name} ${rank}`.trim());
+      const sector =
+        typeof asset.sector === "string"
+          ? asset.sector
+          : typeof asset.category === "string"
+            ? asset.category
+            : "";
+      const sectorBit = sector ? ` · ${sector}` : "";
+      lines.push(`• **${sym}** ${name} ${rank}${sectorBit}`.trim());
     }
+  } else {
+    lines.push("• (no alt assets after exclusion filter)");
   }
 
-  lines.push("", "🏦 **VAULTS.FYI**");
+  lines.push("", "🏦 **DEFI YIELDS (vaults.fyi — alts only)**");
   const networks = report.steps.vaultsNetworks.data;
   if (Array.isArray(networks)) {
-    lines.push(
-      `Networks (${networks.length}): ${networks
-        .slice(0, 5)
-        .map((n) => (n as { name?: string }).name)
-        .filter(Boolean)
-        .join(", ")}…`,
-    );
+    const names = networks
+      .slice(0, 6)
+      .map((n) => (n as { name?: string }).name)
+      .filter(Boolean);
+    if (names.length) lines.push(`Chains: ${names.join(", ")}`);
   }
-  const vaultsRoot = report.steps.vaultsVaults.data as { data?: unknown[] } | unknown[];
-  const vaultItems = Array.isArray(vaultsRoot)
-    ? vaultsRoot
-    : Array.isArray(vaultsRoot?.data)
-      ? vaultsRoot.data
-      : [];
-  if (vaultItems.length) {
-    lines.push(`Top vaults (${vaultItems.length} on page):`);
-    for (const v of vaultItems.slice(0, 4)) {
-      if (!v || typeof v !== "object") continue;
-      const vault = v as Record<string, unknown>;
-      const name = String(vault.name ?? vault.vaultId ?? "vault").slice(0, 60);
-      lines.push(`• ${name}`);
+  const altVaults = vaultItems(report.steps.vaultsVaults.data).filter((v) => {
+    const name = String(v.name ?? v.symbol ?? v.vaultId ?? "");
+    return name && !isExcludedVaultName(name);
+  });
+  if (altVaults.length) {
+    for (const vault of altVaults.slice(0, 5)) {
+      const name = String(vault.name ?? vault.vaultId ?? "vault").slice(0, 70);
+      const apy =
+        vault.apy != null
+          ? ` · APY ${Number(vault.apy).toFixed(2)}%`
+          : vault.apyBase != null
+            ? ` · APY ${Number(vault.apyBase).toFixed(2)}%`
+            : "";
+      lines.push(`• ${name}${apy}`);
     }
+  } else {
+    lines.push("• (no non-stable / non-ETH vaults on first page)");
   }
 
-  lines.push("", "📰 **GLORIA TICKER NEWS**");
+  lines.push("", "📰 **TICKER NEWS (Gloria)**");
   for (const ticker of report.gloriaTickers) {
+    if (!isValidAltTicker(ticker)) continue;
     const step = report.steps.gloria[ticker];
     const summary =
       step?.data &&
       typeof step.data === "object" &&
       "summary" in (step.data as object)
-        ? String((step.data as { summary?: unknown }).summary ?? "").slice(0, 400)
+        ? String((step.data as { summary?: unknown }).summary ?? "").slice(0, 420)
         : "";
+    const isMacro =
+      summary &&
+      /\b(boj|mufg|iron ore|jgb|yen|628\b|75\b.*boJ|no qualifying)\b/i.test(summary) &&
+      !/\b(crypto|token|defi|solana|arbitrum|blockchain)\b/i.test(summary);
     lines.push(`**$${ticker}**`);
-    lines.push(summary || "• (no summary)");
+    if (summary && !isMacro) {
+      lines.push(summary);
+    } else {
+      lines.push("• No alt-specific headline in last 24h (filtered macro noise).");
+    }
     lines.push("");
   }
 

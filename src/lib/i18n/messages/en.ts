@@ -103,7 +103,7 @@ export const en = {
     defaultPromptSurfTokenomics:
       "Analyze tokenomics for BTC, ETH, and SOL: supply structure, unlock pressure, and key risks.",
     defaultPromptStackB:
-      "Research top altcoins ex stables/BTC/ETH/BNB/XRP: narratives, fundamentals, DeFi yields, ticker news.",
+      "Mid-cap altcoin scan: L1/L2/DeFi narratives, TVL rotation, unlocks (STRICT — no BTC, ETH, BNB, XRP, stables).",
     promptLabel: "Your prompt",
     agentNoteSurfNews:
       "Surf Crypto News returns an **AI-curated crypto headline feed** (~0.001 USDC/run). No prompt needed — click Run Agent for the latest headlines from Surf (nano.blockrun.ai). For custom search queries, use **Web Search Writer**.",
@@ -275,7 +275,7 @@ export const en = {
     messariPartial:
       "Messari only fetches **BTC / ETH / SOL** metrics (ATH, price, volume) from keywords — not a full answer to your question.",
     stackBFull:
-      "Stack B runs **6 x402 calls** in one Run (~0.22 USDC): Exa search → Messari details → vaults.fyi networks & vaults → Gloria news for 3 tickers inferred from your prompt.",
+      "Stack B: **alt-only** (~0.22 USDC) — Exa narratives → Messari fundamentals → vaults.fyi yields → Gloria news ×3. **Loại cứng** BTC, ETH, BNB, XRP & stablecoin ở mọi bước.",
   },
   meta: {
     homeTitle: "Nano.Agent — x402 AI agents paid with USDC",

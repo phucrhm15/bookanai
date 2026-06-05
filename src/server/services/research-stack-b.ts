@@ -52,49 +52,15 @@ const STEP_PRICES = {
   gloria: 0.031,
 } as const;
 
-const DEFAULT_MESSARI_SLUGS = [
-  "solana",
-  "hyperliquid",
-  "avalanche-2",
-  "chainlink",
-  "aave",
-  "uniswap",
-  "arbitrum",
-  "optimism",
-  "sui",
-  "dogecoin",
-] as const;
-
-const DEFAULT_GLORIA_TICKERS = ["SOL", "AVAX", "LINK"] as const;
-
-const TICKER_TO_SLUG: Record<string, string> = {
-  SOL: "solana",
-  HYPE: "hyperliquid",
-  AVAX: "avalanche-2",
-  LINK: "chainlink",
-  AAVE: "aave",
-  UNI: "uniswap",
-  ARB: "arbitrum",
-  OP: "optimism",
-  SUI: "sui",
-  DOGE: "dogecoin",
-  ADA: "cardano",
-  DOT: "polkadot",
-  NEAR: "near",
-  RNDR: "render-token",
-  FET: "fetch-ai",
-  TIA: "celestia",
-  SEI: "sei-network",
-  MNT: "mantle",
-  APT: "aptos",
-  INJ: "injective",
-  BTC: "bitcoin",
-  ETH: "ethereum",
-  XRP: "xrp",
-  BNB: "binance-coin",
-};
-
-type StepKey = keyof typeof STEP_PRICES;
+import {
+  buildStackBExaQuery,
+  extractAltTickersFromText,
+  extractMessariSymbols,
+  filterAltSlugs,
+  gloriaTickersForStackB,
+  messariSlugsForStackB,
+  TICKER_TO_SLUG,
+} from "@/lib/stack-b-exclusions";
 
 function assertUsable(data: unknown, bodyText: string, step: string): void {
   if (!bodyText.trim()) {
@@ -118,23 +84,7 @@ function assertUsable(data: unknown, bodyText: string, step: string): void {
   }
 }
 
-function extractTickersFromText(text: string): string[] {
-  const found = new Set<string>();
-  for (const match of text.matchAll(/\$([A-Z0-9]{2,12})\b/g)) {
-    found.add(match[1]!);
-  }
-  for (const match of text.matchAll(/\b([A-Z]{2,12})\b/g)) {
-    const token = match[1]!;
-    if (
-      !["API", "JSON", "HTTP", "USDC", "BASE", "ETH", "BTC", "XRP", "BNB", "USD", "ETF"].includes(
-        token,
-      )
-    ) {
-      found.add(token);
-    }
-  }
-  return [...found];
-}
+type StepKey = keyof typeof STEP_PRICES;
 
 function extractFromExaData(data: unknown): { tickers: string[]; slugs: string[] } {
   const textParts: string[] = [];
@@ -152,32 +102,11 @@ function extractFromExaData(data: unknown): { tickers: string[]; slugs: string[]
       }
     }
   }
-  const blob = textParts.join("\n");
-  const tickers = extractTickersFromText(blob);
-  const slugs = tickers
-    .map((t) => TICKER_TO_SLUG[t])
-    .filter((s): s is string => Boolean(s));
-  return { tickers, slugs: [...new Set(slugs)] };
-}
-
-function messariSlugsForPrompt(prompt: string, exaSlugs: string[]): string {
-  const fromPrompt = extractTickersFromText(prompt.toUpperCase())
-    .map((t) => TICKER_TO_SLUG[t])
-    .filter(Boolean);
-  const merged = [...new Set([...exaSlugs, ...fromPrompt, ...DEFAULT_MESSARI_SLUGS])].slice(
-    0,
-    10,
+  const tickers = extractAltTickersFromText(textParts.join("\n"));
+  const slugs = filterAltSlugs(
+    tickers.map((t) => TICKER_TO_SLUG[t]).filter((s): s is string => Boolean(s)),
   );
-  return merged.join(",");
-}
-
-function gloriaTickersForPrompt(prompt: string, exaTickers: string[]): string[] {
-  const fromPrompt = extractTickersFromText(prompt.toUpperCase());
-  const merged = [...new Set([...exaTickers, ...fromPrompt, ...DEFAULT_GLORIA_TICKERS])];
-  const filtered = merged.filter(
-    (t) => !["BTC", "ETH", "XRP", "BNB", "USDC", "USDT"].includes(t),
-  );
-  return (filtered.length >= 3 ? filtered : [...DEFAULT_GLORIA_TICKERS]).slice(0, 3);
+  return { tickers, slugs };
 }
 
 async function queueUserReimbursement(
@@ -276,7 +205,9 @@ export async function processResearchStackB(
   await ensureClerkUserWalletSynced(clerkId);
   userStore.requireByClerkId(clerkId);
 
-  const userPrompt = prompt?.trim() || "Top crypto altcoins research ex stables BTC ETH BNB XRP";
+  const userPrompt =
+    prompt?.trim() ||
+    "Top mid-cap altcoins: narratives, TVL, token unlocks, DeFi rotation (exclude BTC ETH BNB XRP stables)";
   const totalUsdc = stackTotalUsdc();
   console.info(`[stack-b] Estimated total: ${totalUsdc} USDC`);
 
@@ -321,6 +252,7 @@ export async function processResearchStackB(
     debited = true;
     debitedAmount = totalUsdc;
 
+    const exaQuery = buildStackBExaQuery(userPrompt);
     const exa = await payStep(
       "exa",
       EXA_URL,
@@ -329,9 +261,9 @@ export async function processResearchStackB(
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: {
-          query: userPrompt,
+          query: exaQuery,
           type: "auto",
-          numResults: 8,
+          numResults: 10,
           contents: { text: { maxCharacters: 800 }, highlights: { numSentences: 2 } },
         },
       },
@@ -339,10 +271,9 @@ export async function processResearchStackB(
     actualSpentUsdc += stepPrice("exa");
 
     const { tickers: exaTickers, slugs: exaSlugs } = extractFromExaData(exa.data);
-    const messariSlugs = messariSlugsForPrompt(userPrompt, exaSlugs);
-    const gloriaTickers = gloriaTickersForPrompt(userPrompt, exaTickers);
+    const messariSlugCsv = messariSlugsForStackB(userPrompt, exaSlugs);
 
-    const messariUrl = `${MESSARI_DETAILS_URL}?slugs=${encodeURIComponent(messariSlugs)}&limit=10`;
+    const messariUrl = `${MESSARI_DETAILS_URL}?slugs=${encodeURIComponent(messariSlugCsv)}&limit=10`;
     const [messari, vaultsNetworks, vaultsVaults] = await Promise.all([
       payStep("messari", messariUrl, targetChainId as SupportedChainId, {
         method: "GET",
@@ -359,6 +290,9 @@ export async function processResearchStackB(
     ]);
     actualSpentUsdc += stepPrice("messari") + stepPrice("vaultsNetworks") + stepPrice("vaultsVaults");
 
+    const messariSymbols = extractMessariSymbols(messari.data);
+    const gloriaTickers = gloriaTickersForStackB(userPrompt, exaTickers, messariSymbols);
+
     const gloria: Record<string, StackBStepResult> = {};
     for (const ticker of gloriaTickers) {
       const url = `${GLORIA_TICKER_URL}?ticker=${encodeURIComponent(ticker)}`;
@@ -372,7 +306,7 @@ export async function processResearchStackB(
     const report: StackBReport = {
       stack: "B",
       prompt: userPrompt,
-      messariSlugs: messariSlugs.split(","),
+      messariSlugs: messariSlugCsv.split(",").filter(Boolean),
       gloriaTickers,
       chargedUsdc: totalUsdc,
       steps: { exa, messari, vaultsNetworks, vaultsVaults, gloria },

@@ -67,7 +67,7 @@ export const AGENTS: Agent[] = [
     category: "Research Stack",
     price: 0.22,
     description:
-      "One-click alt research (~0.22 USDC): Exa search + Messari details + vaults.fyi + Gloria ticker news ×3.",
+      "Alt-only research (~0.22 USDC): Exa + Messari + vaults.fyi + Gloria ×3. Hard-excludes BTC, ETH, BNB, XRP & stables.",
     emoji: "🔬",
     accent: "lime",
     baseUrl: "https://agents.circle.com/services",

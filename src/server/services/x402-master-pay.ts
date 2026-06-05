@@ -157,6 +157,19 @@ async function ensureMasterWalletUsdcOnBase(minUsdc: number): Promise<void> {
   }
 }
 
+/** x402 EOA that pays Circle Agent APIs (on-chain Base USDC, not Gateway deposit). */
+export function getMasterX402DepositorAddress(): `0x${string}` {
+  return masterDepositorAddress();
+}
+
+export async function getMasterBaseWalletUsdc(): Promise<number> {
+  return readMasterBaseWalletUsdc();
+}
+
+export async function assertMasterBaseUsdcBalance(minUsdc: number): Promise<void> {
+  return ensureMasterWalletUsdcOnBase(minUsdc);
+}
+
 async function resolveGatewayChainForResource(
   resourceUrl: string,
   privateKey: `0x${string}`,

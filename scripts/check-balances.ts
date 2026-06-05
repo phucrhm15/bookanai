@@ -48,6 +48,27 @@ if (eth < 0.0001) {
   console.log("  ⚠ Low ETH — nạp ~0.001 ETH Base vào địa chỉ trên (admin), không phải ví user.");
 }
 
+const usdcAbi = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+const usdcRaw = await baseClient.readContract({
+  address: BASE_USDC_CONTRACT_ADDRESS,
+  abi: usdcAbi,
+  functionName: "balanceOf",
+  args: [x402],
+});
+const usdcOnChain = Number.parseFloat((Number(usdcRaw) / 1e6).toFixed(6));
+console.log(`  USDC on-chain (x402 pay): ${usdcOnChain}`);
+if (usdcOnChain < 0.22) {
+  console.log("  ⚠ Thiếu USDC — Stack B cần ~0.22 USDC/lần. Nạp USDC Base vào địa chỉ trên.");
+}
+
 if (existsSync(resolve("data/bookanai.db"))) {
   console.log("\nSQLite: data/bookanai.db exists");
 }

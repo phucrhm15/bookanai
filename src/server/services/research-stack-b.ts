@@ -28,6 +28,10 @@ import {
   type StackBReport,
   type StackBStepResult,
 } from "@/lib/stack-b-format";
+import {
+  assertMasterBaseUsdcBalance,
+  getMasterX402DepositorAddress,
+} from "@/server/services/x402-master-pay";
 
 const INSUFFICIENT_MSG = "Số dư không đủ để thanh toán cho Agent này";
 export const RESEARCH_STACK_B_AGENT_ID = "crypto-research-b";
@@ -246,6 +250,19 @@ export async function processResearchStackB(
   const userPrompt = prompt?.trim() || "Top crypto altcoins research ex stables BTC ETH BNB XRP";
   const totalUsdc = stackTotalUsdc();
   console.info(`[stack-b] Estimated total: ${totalUsdc} USDC`);
+
+  try {
+    await assertMasterBaseUsdcBalance(totalUsdc);
+  } catch (error) {
+    if (error instanceof CircleServiceError) {
+      const addr = getMasterX402DepositorAddress();
+      throw new CircleServiceError(
+        `${error.message} Stack B cần ~${totalUsdc.toFixed(3)} USDC on-chain trên Base tại ${addr} (admin nạp, không phải Content Credits user).`,
+        "INSUFFICIENT_BALANCE",
+      );
+    }
+    throw error;
+  }
 
   const unified = await getUnifiedBalance(userWalletId);
   const credits = await syncWalletCreditsForUser(clerkId, unified.totalUsdc);

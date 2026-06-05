@@ -148,7 +148,8 @@ export function Studio() {
                 <div>
                   <div className="text-sm font-semibold">{activeAgent.name}</div>
                   <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {activeAgent.handle} · {activeAgent.baseUrl.replace("https://", "")}
+                    {activeAgent.handle} ·{" "}
+                  {(activeAgent.baseUrl ?? "x402").replace("https://", "")}
                   </div>
                 </div>
               </div>

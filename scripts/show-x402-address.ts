@@ -22,7 +22,7 @@ if (!pk || /0{64}/.test(pk.replace(/^0x/, ""))) {
 }
 
 const account = privateKeyToAccount(pk as `0x${string}`);
-console.log("X402 Gateway EOA (fund USDC here for marketplace payments):");
+console.log("X402 payer EOA (MASTER_AGENT_PRIVATE_KEY — fund USDC + ETH; user reimbursements land here):");
 console.log(account.address);
-console.log("\nCircle DCW master (on-chain reimbursement target, NOT x402 Gateway):");
+console.log("\nCircle DCW master (separate ops wallet — NOT the x402 payer):");
 console.log("Check MASTER_CIRCLE_WALLET_ID via npm run init:master");

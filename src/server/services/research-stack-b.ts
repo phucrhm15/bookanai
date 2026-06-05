@@ -18,7 +18,7 @@ import { CircleServiceError } from "@/services/circle-errors";
 import {
   activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
-  processSettlementBatch,
+  processSettlementBatchForUser,
   reserveOnchainSettlement,
   syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
@@ -180,6 +180,35 @@ function gloriaTickersForPrompt(prompt: string, exaTickers: string[]): string[] 
   return (filtered.length >= 3 ? filtered : [...DEFAULT_GLORIA_TICKERS]).slice(0, 3);
 }
 
+async function queueUserReimbursement(
+  clerkId: string,
+  userWalletId: string,
+  ledgerEntryId: string,
+  amountUsdc: number,
+  targetChainId: SupportedChainId,
+): Promise<string | undefined> {
+  if (amountUsdc <= 0) return undefined;
+  const id = reserveOnchainSettlement({
+    ledgerEntryId,
+    userId: clerkId,
+    circleWalletId: userWalletId,
+    amountUsdc,
+    targetChainId,
+  });
+  activateOnchainSettlement(id);
+  console.info(`[stack-b] Queued user→x402 reimbursement: ${id} (${amountUsdc} USDC)`);
+  try {
+    await processSettlementBatchForUser(clerkId);
+  } catch (err) {
+    console.warn("[stack-b] user→x402 settlement batch failed (will retry on Wallet sync):", err);
+  }
+  return id;
+}
+
+function stepPrice(step: StepKey): number {
+  return STEP_PRICES[step];
+}
+
 function stackTotalUsdc(): number {
   return (
     STEP_PRICES.exa +
@@ -277,6 +306,7 @@ export async function processResearchStackB(
 
   let debited = false;
   let debitedAmount = 0;
+  let actualSpentUsdc = 0;
   let ledgerEntryId: string | undefined;
   let onChainSettlementQueuedId: string | undefined;
 
@@ -306,6 +336,7 @@ export async function processResearchStackB(
         },
       },
     );
+    actualSpentUsdc += stepPrice("exa");
 
     const { tickers: exaTickers, slugs: exaSlugs } = extractFromExaData(exa.data);
     const messariSlugs = messariSlugsForPrompt(userPrompt, exaSlugs);
@@ -326,6 +357,7 @@ export async function processResearchStackB(
         headers: { Accept: "application/json", "x-402-auth": "true" },
       }),
     ]);
+    actualSpentUsdc += stepPrice("messari") + stepPrice("vaultsNetworks") + stepPrice("vaultsVaults");
 
     const gloria: Record<string, StackBStepResult> = {};
     for (const ticker of gloriaTickers) {
@@ -334,6 +366,7 @@ export async function processResearchStackB(
         method: "GET",
         headers: { Accept: "application/json" },
       });
+      actualSpentUsdc += stepPrice("gloria");
     }
 
     const report: StackBReport = {
@@ -348,17 +381,13 @@ export async function processResearchStackB(
     const rawResponse = JSON.stringify(report);
     const generatedContent = formatStackBForDisplay(report);
 
-    onChainSettlementQueuedId = reserveOnchainSettlement({
+    onChainSettlementQueuedId = await queueUserReimbursement(
+      clerkId,
+      userWalletId,
       ledgerEntryId,
-      userId: clerkId,
-      circleWalletId: userWalletId,
-      amountUsdc: totalUsdc,
-      targetChainId: targetChainId as SupportedChainId,
-    });
-    activateOnchainSettlement(onChainSettlementQueuedId);
-    void processSettlementBatch().catch((err) => {
-      console.warn("[stack-b] Background settlement batch failed:", err);
-    });
+      totalUsdc,
+      targetChainId as SupportedChainId,
+    );
 
     const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
 
@@ -392,15 +421,29 @@ export async function processResearchStackB(
     }
 
     if (debited && debitedAmount > 0) {
+      const refundAmount = Math.max(0, debitedAmount - actualSpentUsdc);
       try {
-        userStore.credit(
-          clerkId,
-          debitedAmount,
-          ledgerLabelRefundX402(RESEARCH_STACK_B_AGENT_ID),
-        );
-        console.warn(`[stack-b] SQLite refund ${debitedAmount} USDC for clerkId=${clerkId}`);
+        if (refundAmount > 0) {
+          userStore.credit(
+            clerkId,
+            refundAmount,
+            ledgerLabelRefundX402(RESEARCH_STACK_B_AGENT_ID),
+          );
+          console.warn(
+            `[stack-b] SQLite refund ${refundAmount} USDC (spent ${actualSpentUsdc.toFixed(6)}) for clerkId=${clerkId}`,
+          );
+        }
+        if (actualSpentUsdc > 0 && ledgerEntryId) {
+          onChainSettlementQueuedId = await queueUserReimbursement(
+            clerkId,
+            userWalletId,
+            ledgerEntryId,
+            actualSpentUsdc,
+            targetChainId as SupportedChainId,
+          );
+        }
       } catch (rollbackError) {
-        console.error("[stack-b] SQLite refund failed:", rollbackError);
+        console.error("[stack-b] SQLite refund / partial settlement failed:", rollbackError);
       }
     }
 

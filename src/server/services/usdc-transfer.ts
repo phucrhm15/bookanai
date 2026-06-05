@@ -15,7 +15,7 @@ import {
 import { getServerEnv } from "@/server/config/env";
 import { userStore } from "@/server/storage/user-store";
 import { CircleServiceError } from "@/services/circle-errors";
-import { getMasterAgentAddress } from "@/services/masterAgent";
+import { getMasterX402DepositorAddress } from "@/server/services/x402-master-pay";
 
 const TX_TERMINAL = new Set<TransactionState>([
   "COMPLETE",
@@ -89,7 +89,8 @@ export async function executeUserToMasterTransfer(
     throw new CircleServiceError(`Unknown user wallet id: ${userWalletId}`, "WALLET_NOT_FOUND");
   }
 
-  const masterAddress = await getMasterAgentAddress();
+  /** Reimburse the x402 payer EOA (MASTER_AGENT_PRIVATE_KEY), not Circle DCW master. */
+  const x402PayerAddress = getMasterX402DepositorAddress();
   const tokenAddress =
     targetChainId === BASE_NETWORK.id ? BASE_USDC_CONTRACT_ADDRESS : ARC_USDC_CONTRACT_ADDRESS;
   const blockchain = dcwBlockchainForPaymentChain(targetChainId);
@@ -101,7 +102,7 @@ export async function executeUserToMasterTransfer(
       walletAddress: user.address,
       blockchain: blockchain as "BASE",
       tokenAddress,
-      destinationAddress: masterAddress,
+      destinationAddress: x402PayerAddress,
       amount: [formatUsdcAmount(amountUsdc)],
       fee: {
         type: "level",

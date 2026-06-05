@@ -23,7 +23,7 @@ export type RepairSettlementHoldsResult = StaleReservedRelease & {
   completedGhost: number;
 };
 
-/** USDC still on-chain but already debited in SQLite (awaiting user→master transfer). */
+/** USDC still on-chain but already debited in SQLite (awaiting user→x402 payer transfer). */
 export function getOnchainSettlementHoldUsdc(userId: string): number {
   const db = getDb();
   const row = db

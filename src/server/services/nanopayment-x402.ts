@@ -30,7 +30,7 @@ import {
 import {
   activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
-  processSettlementBatch,
+  processSettlementBatchForUser,
   reserveOnchainSettlement,
   syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
@@ -276,10 +276,12 @@ export async function processNanopaymentX402(
       targetChainId: targetChainId as SupportedChainId,
     });
     activateOnchainSettlement(onChainSettlementQueuedId);
-    console.info(`[x402] Queued user→master settlement: ${onChainSettlementQueuedId}`);
-    void processSettlementBatch().catch((err) => {
-      console.warn("[x402] Background settlement batch failed:", err);
-    });
+    console.info(`[x402] Queued user→x402 reimbursement: ${onChainSettlementQueuedId}`);
+    try {
+      await processSettlementBatchForUser(clerkId);
+    } catch (err) {
+      console.warn("[x402] user→x402 settlement batch failed (will retry on Wallet sync):", err);
+    }
 
     const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
 

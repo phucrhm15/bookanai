@@ -16,7 +16,7 @@ const PAYMENT_VERIFY_RE =
 const AISA_API_KEY_RE = /invalid api key/i;
 const RPC_AUTH_RE =
   /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
-const   MARKET_TIMEOUT_RE =
+const MARKET_TIMEOUT_RE =
   /AI Agent Marketplace did not respond within|did not respond within \d+ms|TIMEOUT/i;
 const PROBE_HTTP_RE =
   /Agent không phát hành x402 402|Probe x402 marketplace|không có giá trong Discovery metadata/i;

@@ -4,12 +4,13 @@ import type { Locale } from "@/lib/i18n/types";
 
 const AGENT_I18N_KEYS: Record<
   string,
-  "messari" | "perplexity" | "surf" | "surfTokenomics"
+  "messari" | "perplexity" | "surf" | "surfTokenomics" | "stackB"
 > = {
   "messari-analyst": "messari",
   "perplexity-social": "perplexity",
   "surf-news": "surf",
   "surf-tokenomics": "surfTokenomics",
+  "crypto-research-b": "stackB",
 };
 
 /** Agents with locale-specific description & category (names stay English). */

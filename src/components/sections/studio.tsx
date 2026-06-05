@@ -93,7 +93,10 @@ export function Studio() {
       payInFlight.current = false;
     }
 
-    const body = payment?.rawResponse?.trim() || payment?.generatedContent?.trim();
+    const body =
+      activeAgent.id === "crypto-research-b"
+        ? payment?.generatedContent?.trim() || payment?.rawResponse?.trim()
+        : payment?.rawResponse?.trim() || payment?.generatedContent?.trim();
     if (!body) {
       toast.error(t("studio.paymentNoData"));
       setState("idle");

@@ -76,6 +76,11 @@ export const en = {
         "Tokenomics snapshots from Surf (~0.0019 USDC/call): supply, unlocks, and token structure.",
       category: "Token Research",
     },
+    stackB: {
+      description:
+        "One-click alt research (~0.22 USDC): Exa + Messari details + vaults.fyi + Gloria ticker news ×3.",
+      category: "Research Stack",
+    },
   },
   studio: {
     badge: "Studio",
@@ -97,6 +102,8 @@ export const en = {
     defaultPromptSurf: "Give me the top crypto headlines today and why they matter.",
     defaultPromptSurfTokenomics:
       "Analyze tokenomics for BTC, ETH, and SOL: supply structure, unlock pressure, and key risks.",
+    defaultPromptStackB:
+      "Research top altcoins ex stables/BTC/ETH/BNB/XRP: narratives, fundamentals, DeFi yields, ticker news.",
     promptLabel: "Your prompt",
     agentNoteSurfNews:
       "Surf Crypto News returns an **AI-curated crypto headline feed** (~0.001 USDC/run). No prompt needed — click Run Agent for the latest headlines from Surf (nano.blockrun.ai). For custom search queries, use **Web Search Writer**.",
@@ -267,6 +274,8 @@ export const en = {
       "Surf Tokenomics only reads a **token symbol** from your prompt (API ?symbol=). Will query **{{symbol}}** — not full natural-language analysis.",
     messariPartial:
       "Messari only fetches **BTC / ETH / SOL** metrics (ATH, price, volume) from keywords — not a full answer to your question.",
+    stackBFull:
+      "Stack B runs **6 x402 calls** in one Run (~0.22 USDC): Exa search → Messari details → vaults.fyi networks & vaults → Gloria news for 3 tickers inferred from your prompt.",
   },
   meta: {
     homeTitle: "Nano.Agent — x402 AI agents paid with USDC",

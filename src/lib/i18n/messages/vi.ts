@@ -79,6 +79,11 @@ export const vi: typeof en = {
         "Phân tích tokenomics từ Surf (~0.0019 USDC/lần): cung, unlock và cấu trúc token.",
       category: "Nghiên cứu token",
     },
+    stackB: {
+      description:
+        "Nghiên cứu alt một lần bấm (~0.22 USDC): Exa + Messari details + vaults.fyi + Gloria ticker ×3.",
+      category: "Research Stack",
+    },
   },
   studio: {
     badge: "Studio",
@@ -100,6 +105,8 @@ export const vi: typeof en = {
     defaultPromptSurf: "Cho tôi các headline crypto nổi bật hôm nay và vì sao quan trọng.",
     defaultPromptSurfTokenomics:
       "Phân tích tokenomics BTC, ETH, SOL: cấu trúc nguồn cung, áp lực unlock và rủi ro chính.",
+    defaultPromptStackB:
+      "Nghiên cứu top alt (trừ stable/BTC/ETH/BNB/XRP): narrative, fundamentals, yield DeFi, tin ticker.",
     promptLabel: "Prompt của bạn",
     agentNoteSurfNews:
       "Surf Crypto News trả **feed tin crypto được AI chọn lọc** (~0.001 USDC/lần). Không cần nhập prompt — bấm Chạy Agent để lấy headline mới nhất từ Surf (nano.blockrun.ai). Muốn tìm kiếm theo câu hỏi? Chọn **Web Search Writer**.",
@@ -271,6 +278,8 @@ export const vi: typeof en = {
       "Surf Tokenomics chỉ đọc **mã token** trong prompt (API ?symbol=). Sẽ gọi symbol **{{symbol}}** — không phải phân tích câu văn đầy đủ.",
     messariPartial:
       "Messari chỉ lấy **BTC / ETH / SOL** (ATH, giá, volume) theo từ khóa trong prompt — không viết bài phân tích theo câu hỏi.",
+    stackBFull:
+      "Stack B chạy **6 lần gọi x402** trong một Run (~0.22 USDC): Exa → Messari details → vaults.fyi networks & vaults → Gloria tin ticker ×3 (suy từ prompt).",
   },
   meta: {
     homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",

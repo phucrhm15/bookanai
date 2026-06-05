@@ -35,6 +35,10 @@ import {
   syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
 import { userStore, UserStoreError } from "@/server/storage/user-store";
+import {
+  processResearchStackB,
+  RESEARCH_STACK_B_AGENT_ID,
+} from "@/server/services/research-stack-b";
 
 const INSUFFICIENT_MSG = "Số dư không đủ để thanh toán cho Agent này";
 
@@ -168,6 +172,16 @@ export async function processNanopaymentX402(
 
   await ensureClerkUserWalletSynced(clerkId);
   userStore.requireByClerkId(clerkId);
+
+  if (agentServiceId === RESEARCH_STACK_B_AGENT_ID) {
+    return processResearchStackB(
+      clerkId,
+      userWalletId,
+      targetChainId,
+      prompt,
+      idempotencyKey,
+    );
+  }
 
   const { resourceUrl: mappedUrl, discoveryItem } = await resolveAgentResource(agentServiceId);
   const resourceUrl = withAgentResourceQuery(agentServiceId, mappedUrl, prompt);

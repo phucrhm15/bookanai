@@ -36,6 +36,7 @@ const PROMPT_PLACEHOLDER_KEYS: Partial<Record<string, string>> = {
   "messari-analyst": "studio.defaultPromptMessari",
   "perplexity-social": "studio.defaultPromptPerplexity",
   "surf-tokenomics": "studio.defaultPromptSurfTokenomics",
+  "crypto-research-b": "studio.defaultPromptStackB",
 };
 
 const AGENT_NOTE_KEYS: Partial<Record<string, string>> = {
@@ -91,6 +92,13 @@ export function agentPromptBehavior(
 
   if (agentId === "perplexity-social") {
     return { mode: "full" };
+  }
+
+  if (agentId === "crypto-research-b") {
+    return {
+      mode: "full",
+      info: translate(locale, "hints.stackBFull"),
+    };
   }
 
   return { mode: "full" };

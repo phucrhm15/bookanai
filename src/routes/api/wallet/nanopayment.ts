@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { defaultPaymentChainId } from "@/lib/circle-dcw-blockchains";
 import { getServerEnv } from "@/server/config/env";
 import { NANOPAYMENT_ROUTE_BUDGET_MS } from "@/server/config/api-timeouts";
+import { RESEARCH_STACK_B_ROUTE_BUDGET_MS } from "@/server/services/research-stack-b";
 import { CircleServiceError } from "@/services/circle-errors";
 import { circleRuntimeReady, ensureClerkUserWalletSynced } from "@/services/circleService";
 import { processNanopaymentX402 } from "@/server/services/nanopayment-x402";
@@ -12,17 +13,17 @@ import {
 } from "@/server/auth/clerk-session";
 import { userStore } from "@/server/storage/user-store";
 
-function withRouteBudget<T>(work: () => Promise<T>): Promise<T> {
+function withRouteBudget<T>(work: () => Promise<T>, budgetMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
       () =>
         reject(
           new CircleServiceError(
-            `Nanopayment route exceeded ${NANOPAYMENT_ROUTE_BUDGET_MS}ms`,
+            `Nanopayment route exceeded ${budgetMs}ms`,
             "TIMEOUT",
           ),
         ),
-      NANOPAYMENT_ROUTE_BUDGET_MS,
+      budgetMs,
     );
     work()
       .then((value) => {
@@ -84,15 +85,22 @@ export const Route = createFileRoute("/api/wallet/nanopayment")({
           const env = getServerEnv();
           const targetChainId = body.targetChainId ?? defaultPaymentChainId(env.CIRCLE_API_KEY);
 
-          const result = await withRouteBudget(() =>
-            processNanopaymentX402(
-              clerkId,
-              body.userWalletId!,
-              body.agentServiceId!,
-              targetChainId,
-              body.prompt,
-              body.idempotencyKey,
-            ),
+          const routeBudgetMs =
+            body.agentServiceId === "crypto-research-b"
+              ? RESEARCH_STACK_B_ROUTE_BUDGET_MS
+              : NANOPAYMENT_ROUTE_BUDGET_MS;
+
+          const result = await withRouteBudget(
+            () =>
+              processNanopaymentX402(
+                clerkId,
+                body.userWalletId!,
+                body.agentServiceId!,
+                targetChainId,
+                body.prompt,
+                body.idempotencyKey,
+              ),
+            routeBudgetMs,
           );
 
           return Response.json(result);

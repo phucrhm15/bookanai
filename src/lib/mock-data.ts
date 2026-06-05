@@ -6,7 +6,7 @@ export type Agent = {
   price: number; // USDC per request (display hint; charged price comes from x402 probe)
   description: string;
   emoji: string;
-  accent: "cyan" | "magenta";
+  accent: "cyan" | "magenta" | "lime";
   /** x402 marketplace base URL */
   baseUrl: string;
 };
@@ -59,6 +59,17 @@ export const AGENTS: Agent[] = [
     emoji: "🧬",
     accent: "magenta",
     baseUrl: "https://nano.blockrun.ai",
+  },
+  {
+    id: "crypto-research-b",
+    name: "Crypto Research Stack B",
+    handle: "@stack_b",
+    category: "Research Stack",
+    price: 0.22,
+    description:
+      "One-click alt research (~0.22 USDC): Exa search + Messari details + vaults.fyi + Gloria ticker news ×3.",
+    emoji: "🔬",
+    accent: "lime",
   },
 ];
 

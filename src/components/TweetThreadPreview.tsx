@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import type { TranslateParams } from "@/lib/i18n/translate";
+import { formatStackBForDisplay, isStackBReport } from "@/lib/stack-b-format";
 
 const TWEET_MAX = 280;
 
@@ -291,6 +292,9 @@ export function parseAgentData(agentId: string, rawResponse: string, t: TFn): st
     if (agentId === "perplexity-social") return formatPerplexityData(parsed, t);
     if (agentId === "surf-news") return formatSurfData(parsed, t);
     if (agentId === "surf-tokenomics") return formatSurfData(parsed, t, true);
+    if (agentId === "crypto-research-b" && isStackBReport(parsed)) {
+      return formatStackBForDisplay(parsed);
+    }
     if (typeof parsed === "string") return parsed;
     return JSON.stringify(parsed, null, 2);
   } catch {

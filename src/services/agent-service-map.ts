@@ -27,6 +27,8 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   "perplexity-social": "https://api.exa.ai/search",
   "surf-news": "https://nano.blockrun.ai/api/v1/surf/news/feed",
   "surf-tokenomics": "https://nano.blockrun.ai/api/v1/surf/token/tokenomics",
+  /** Orchestrated multi-API workflow — probe uses Exa entry point */
+  "crypto-research-b": "https://api.exa.ai/search",
 };
 
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
@@ -35,10 +37,17 @@ export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> =
   "surf-news": 0.001,
   "surf-tokenomics": 0.0019,
   "messari-analyst": 0.1,
+  "crypto-research-b": 0.218,
 };
 
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
-const DIRECT_X402_HOSTS = new Set(["api.messari.io", "nano.blockrun.ai", "api.exa.ai"]);
+const DIRECT_X402_HOSTS = new Set([
+  "api.messari.io",
+  "nano.blockrun.ai",
+  "api.exa.ai",
+  "api.vaults.fyi",
+  "api.itsgloria.ai",
+]);
 
 /** All HTTPS hosts from STUDIO_AGENT_RESOURCES (+ DIRECT_X402_HOSTS). */
 function studioAllowlistedHosts(): Set<string> {

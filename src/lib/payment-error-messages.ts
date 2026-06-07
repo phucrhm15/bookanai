@@ -5,6 +5,8 @@ const MASTER_GATEWAY_USDC_RE =
   /Circle Gateway thiếu USDC|Gateway thiếu USDC/i;
 const MASTER_ONCHAIN_BASE_RE =
   /thiếu USDC on-chain trên Base|USDC on-chain on Base|x402 exact|khác với npm run gateway:deposit/i;
+const USER_ONCHAIN_TRANSFER_RE =
+  /Không thể chuyển USDC từ ví|Ví on-chain không đủ USDC để chi trả API|User-to-master USDC transfer/i;
 const USER_USDC_RE =
   /Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient USDC|khả dụng|Insufficient balance|Content Credits/i;
 const GAS_RE =
@@ -187,6 +189,21 @@ export function formatPaymentErrorForUser(
       "This agent currently requires a different payment network (detected eip155:137 = Polygon), " +
       "while the app settles x402 on Base (8453). " +
       "Auto-routing is enabled for Base/Polygon, but the master wallet must have USDC (and gas) on the required network."
+    );
+  }
+
+  if (USER_ONCHAIN_TRANSFER_RE.test(message)) {
+    if (locale === "vi") {
+      return (
+        "Không thể chuyển USDC từ ví Content Credits của bạn để trả API agent. " +
+        "Mở Wallet & Billing → kiểm tra số dư on-chain trên Base (cần đủ USDC cho lần gọi, không chỉ ledger). " +
+        "Nạp thêm USDC Base nếu cần — Circle Programmable Wallet không cần ETH gas từ bạn."
+      );
+    }
+    return (
+      "Could not transfer USDC from your Content Credits wallet to pay the agent API. " +
+      "Open Wallet & Billing — confirm on-chain Base USDC (not just ledger balance). " +
+      "Top up USDC on Base if needed; Circle Programmable Wallets do not require ETH gas from you."
     );
   }
 

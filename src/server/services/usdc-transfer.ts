@@ -19,10 +19,13 @@ import { getMasterX402DepositorAddress } from "@/server/services/x402-master-pay
 
 const TX_TERMINAL = new Set<TransactionState>([
   "COMPLETE",
+  "CONFIRMED",
   "FAILED",
   "DENIED",
   "CANCELLED",
 ]);
+
+const TX_SUCCESS = new Set<TransactionState>(["COMPLETE", "CONFIRMED"]);
 
 let dcwClient: ReturnType<typeof initiateDeveloperControlledWalletsClient> | undefined;
 
@@ -64,7 +67,7 @@ async function pollTransferUntilTerminal(transactionId: string): Promise<void> {
     const response = await client.getTransaction({ id: transactionId });
     const state = response.data?.transaction?.state;
     if (state && TX_TERMINAL.has(state)) {
-      if (state === "COMPLETE") return;
+      if (state && TX_SUCCESS.has(state)) return;
       throw new CircleServiceError(
         `User-to-master USDC transfer ended with state ${state}`,
         "SETTLEMENT_FAILED",

@@ -402,7 +402,10 @@ export function supportedPaymentChains(apiKey: string): {
   label: string;
 }[] {
   if (isLiveCircleApiKey(apiKey)) {
-    return [{ chainId: 8453, appKitChain: UB_CHAIN_BASE, label: "Base" }];
+    return [
+      { chainId: 8453, appKitChain: UB_CHAIN_BASE, label: "Base" },
+      { chainId: 5042002, appKitChain: UB_CHAIN_ARC, label: "Arc Testnet" },
+    ];
   }
   return [{ chainId: 5042002, appKitChain: UB_CHAIN_ARC, label: "Arc Testnet" }];
 }

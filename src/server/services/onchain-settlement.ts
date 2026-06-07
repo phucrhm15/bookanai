@@ -89,7 +89,28 @@ export function cancelOnchainSettlementForLedgerEntry(ledgerEntryId: string): vo
     .where(
       and(
         eq(pendingOnchainSettlements.ledgerEntryId, ledgerEntryId),
-        eq(pendingOnchainSettlements.status, "reserved"),
+        inArray(pendingOnchainSettlements.status, ["reserved", "pending"]),
+      ),
+    )
+    .run();
+}
+
+/** User→x402 transfer finished synchronously before API pay (no batch worker). */
+export function completeOnchainSettlementPrefunded(
+  reservationId: string,
+  circleTransactionId: string,
+): void {
+  getDb()
+    .update(pendingOnchainSettlements)
+    .set({
+      status: "complete",
+      circleTransactionId,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(pendingOnchainSettlements.id, reservationId),
+        inArray(pendingOnchainSettlements.status, ["reserved", "pending", "submitted"]),
       ),
     )
     .run();

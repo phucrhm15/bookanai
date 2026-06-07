@@ -5,11 +5,12 @@
  *  1. Discovery → resolve resource URL (Circle x402 catalog)
  *  2. Probe HTTP 402 → dynamic USDC price (never hardcoded UI price)
  *  3. SQLite ledger debit (exact agent price)
- *  4. GatewayClient.pay(resourceUrl) → marketplace content
- *  5. Queue on-chain User → Master USDC (batched; not awaited in HTTP)
- *  6. Return content to UI (on-chain tx completes via cron / background batch)
+ *  4. User Circle wallet → x402 payer EOA on-chain (await)
+ *  5. GatewayClient.pay(resourceUrl) → marketplace content
+ *  6. Return content to UI
  *
- * On Gateway failure after debit: SQLite refund (credit).
+ * On failure before on-chain transfer: SQLite refund.
+ * On failure after on-chain transfer: no ledger refund (USDC already left user wallet).
  */
 import { isSupportedChainId, type SupportedChainId } from "@/lib/chains";
 import { probeX402ResourcePrice } from "@/lib/x402-probe";
@@ -28,12 +29,10 @@ import {
   STUDIO_AGENT_FALLBACK_PRICE_USDC,
 } from "@/services/agent-service-map";
 import {
-  activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
-  processSettlementBatchForUser,
-  reserveOnchainSettlement,
   syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
+import { collectUserUsdcForX402 } from "@/server/services/user-x402-prefund";
 import { userStore, UserStoreError } from "@/server/storage/user-store";
 import {
   processResearchStackB,
@@ -234,6 +233,7 @@ export async function processNanopaymentX402(
   let debitedAmount = 0;
   let ledgerEntryId: string | undefined;
   let onChainSettlementQueuedId: string | undefined;
+  let userPrefunded = false;
 
   try {
     const debitResult = userStore.debit(clerkId, agentPriceUsdc, {
@@ -245,6 +245,16 @@ export async function processNanopaymentX402(
     ledgerEntryId = debitResult.ledgerEntryId;
     debited = true;
     debitedAmount = agentPriceUsdc;
+
+    const prefund = await collectUserUsdcForX402({
+      clerkId,
+      userWalletId,
+      ledgerEntryId,
+      amountUsdc: agentPriceUsdc,
+      targetChainId: targetChainId as SupportedChainId,
+    });
+    userPrefunded = true;
+    onChainSettlementQueuedId = prefund.settlementId;
 
     const response = await settleWithMasterAgentBounded(
       resourceUrl,
@@ -267,21 +277,6 @@ export async function processNanopaymentX402(
         : JSON.stringify(response.data ?? {});
 
     assertAgentResponseUsable(response.data, bodyText);
-
-    onChainSettlementQueuedId = reserveOnchainSettlement({
-      ledgerEntryId,
-      userId: clerkId,
-      circleWalletId: userWalletId,
-      amountUsdc: agentPriceUsdc,
-      targetChainId: targetChainId as SupportedChainId,
-    });
-    activateOnchainSettlement(onChainSettlementQueuedId);
-    console.info(`[x402] Queued user→x402 reimbursement: ${onChainSettlementQueuedId}`);
-    try {
-      await processSettlementBatchForUser(clerkId);
-    } catch (err) {
-      console.warn("[x402] user→x402 settlement batch failed (will retry on Wallet sync):", err);
-    }
 
     const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
 
@@ -314,13 +309,17 @@ export async function processNanopaymentX402(
       cancelOnchainSettlementForLedgerEntry(ledgerEntryId);
     }
 
-    if (debited && debitedAmount > 0) {
+    if (debited && debitedAmount > 0 && !userPrefunded) {
       try {
         userStore.credit(clerkId, debitedAmount, ledgerLabelRefundX402(agentServiceId));
         console.warn(`[x402] SQLite refund ${debitedAmount} USDC for clerkId=${clerkId}`);
       } catch (rollbackError) {
         console.error("[x402] SQLite refund failed:", rollbackError);
       }
+    } else if (userPrefunded) {
+      console.warn(
+        `[x402] No ledger refund — ${debitedAmount} USDC already transferred from user wallet (clerkId=${clerkId})`,
+      );
     }
 
     if (error instanceof CircleServiceError) throw error;

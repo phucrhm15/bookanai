@@ -16,22 +16,16 @@ import {
 } from "@/services/circleService";
 import { CircleServiceError } from "@/services/circle-errors";
 import {
-  activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
-  processSettlementBatchForUser,
-  reserveOnchainSettlement,
   syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
+import { collectUserUsdcForX402 } from "@/server/services/user-x402-prefund";
 import { userStore, UserStoreError } from "@/server/storage/user-store";
 import {
   formatStackBForDisplay,
   type StackBReport,
   type StackBStepResult,
 } from "@/lib/stack-b-format";
-import {
-  assertMasterBaseUsdcBalance,
-  getMasterX402DepositorAddress,
-} from "@/server/services/x402-master-pay";
 
 const INSUFFICIENT_MSG = "Số dư không đủ để thanh toán cho Agent này";
 export const RESEARCH_STACK_B_AGENT_ID = "crypto-research-b";
@@ -107,31 +101,6 @@ function extractFromExaData(data: unknown): { tickers: string[]; slugs: string[]
     tickers.map((t) => TICKER_TO_SLUG[t]).filter((s): s is string => Boolean(s)),
   );
   return { tickers, slugs };
-}
-
-async function queueUserReimbursement(
-  clerkId: string,
-  userWalletId: string,
-  ledgerEntryId: string,
-  amountUsdc: number,
-  targetChainId: SupportedChainId,
-): Promise<string | undefined> {
-  if (amountUsdc <= 0) return undefined;
-  const id = reserveOnchainSettlement({
-    ledgerEntryId,
-    userId: clerkId,
-    circleWalletId: userWalletId,
-    amountUsdc,
-    targetChainId,
-  });
-  activateOnchainSettlement(id);
-  console.info(`[stack-b] Queued user→x402 reimbursement: ${id} (${amountUsdc} USDC)`);
-  try {
-    await processSettlementBatchForUser(clerkId);
-  } catch (err) {
-    console.warn("[stack-b] user→x402 settlement batch failed (will retry on Wallet sync):", err);
-  }
-  return id;
 }
 
 function stepPrice(step: StepKey): number {
@@ -211,19 +180,6 @@ export async function processResearchStackB(
   const totalUsdc = stackTotalUsdc();
   console.info(`[stack-b] Estimated total: ${totalUsdc} USDC`);
 
-  try {
-    await assertMasterBaseUsdcBalance(totalUsdc);
-  } catch (error) {
-    if (error instanceof CircleServiceError) {
-      const addr = getMasterX402DepositorAddress();
-      throw new CircleServiceError(
-        `${error.message} Stack B cần ~${totalUsdc.toFixed(3)} USDC on-chain trên Base tại ${addr} (admin nạp, không phải Content Credits user).`,
-        "INSUFFICIENT_BALANCE",
-      );
-    }
-    throw error;
-  }
-
   const unified = await getUnifiedBalance(userWalletId);
   const credits = await syncWalletCreditsForUser(clerkId, unified.totalUsdc);
   const spendable = credits.spendableCreditsUsdc;
@@ -240,6 +196,7 @@ export async function processResearchStackB(
   let actualSpentUsdc = 0;
   let ledgerEntryId: string | undefined;
   let onChainSettlementQueuedId: string | undefined;
+  let userPrefunded = false;
 
   try {
     const debitResult = userStore.debit(clerkId, totalUsdc, {
@@ -251,6 +208,16 @@ export async function processResearchStackB(
     ledgerEntryId = debitResult.ledgerEntryId;
     debited = true;
     debitedAmount = totalUsdc;
+
+    const prefund = await collectUserUsdcForX402({
+      clerkId,
+      userWalletId,
+      ledgerEntryId,
+      amountUsdc: totalUsdc,
+      targetChainId: targetChainId as SupportedChainId,
+    });
+    userPrefunded = true;
+    onChainSettlementQueuedId = prefund.settlementId;
 
     const exaQuery = buildStackBExaQuery(userPrompt);
     const exa = await payStep(
@@ -315,14 +282,6 @@ export async function processResearchStackB(
     const rawResponse = JSON.stringify(report);
     const generatedContent = formatStackBForDisplay(report);
 
-    onChainSettlementQueuedId = await queueUserReimbursement(
-      clerkId,
-      userWalletId,
-      ledgerEntryId,
-      totalUsdc,
-      targetChainId as SupportedChainId,
-    );
-
     const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
 
     return {
@@ -350,11 +309,24 @@ export async function processResearchStackB(
       throw new CircleServiceError(error.message, code);
     }
 
-    if (ledgerEntryId) {
+    if (ledgerEntryId && !userPrefunded) {
       cancelOnchainSettlementForLedgerEntry(ledgerEntryId);
     }
 
-    if (debited && debitedAmount > 0) {
+    if (debited && debitedAmount > 0 && !userPrefunded) {
+      try {
+        userStore.credit(
+          clerkId,
+          debitedAmount,
+          ledgerLabelRefundX402(RESEARCH_STACK_B_AGENT_ID),
+        );
+        console.warn(
+          `[stack-b] SQLite refund ${debitedAmount} USDC for clerkId=${clerkId}`,
+        );
+      } catch (rollbackError) {
+        console.error("[stack-b] SQLite refund failed:", rollbackError);
+      }
+    } else if (debited && userPrefunded) {
       const refundAmount = Math.max(0, debitedAmount - actualSpentUsdc);
       try {
         if (refundAmount > 0) {
@@ -364,20 +336,15 @@ export async function processResearchStackB(
             ledgerLabelRefundX402(RESEARCH_STACK_B_AGENT_ID),
           );
           console.warn(
-            `[stack-b] SQLite refund ${refundAmount} USDC (spent ${actualSpentUsdc.toFixed(6)}) for clerkId=${clerkId}`,
+            `[stack-b] Partial SQLite refund ${refundAmount} USDC (API spent ${actualSpentUsdc.toFixed(6)}) for clerkId=${clerkId}`,
           );
-        }
-        if (actualSpentUsdc > 0 && ledgerEntryId) {
-          onChainSettlementQueuedId = await queueUserReimbursement(
-            clerkId,
-            userWalletId,
-            ledgerEntryId,
-            actualSpentUsdc,
-            targetChainId as SupportedChainId,
+        } else {
+          console.warn(
+            `[stack-b] No ledger refund — ${debitedAmount.toFixed(6)} USDC already transferred from user wallet (clerkId=${clerkId})`,
           );
         }
       } catch (rollbackError) {
-        console.error("[stack-b] SQLite refund / partial settlement failed:", rollbackError);
+        console.error("[stack-b] Partial SQLite refund failed:", rollbackError);
       }
     }
 

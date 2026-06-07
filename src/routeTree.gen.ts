@@ -21,6 +21,7 @@ import { Route as ApiWalletIndexRouteImport } from './routes/api/wallet/index'
 import { Route as ApiWalletNanopaymentRouteImport } from './routes/api/wallet/nanopayment'
 import { Route as ApiWalletAppKitRouteImport } from './routes/api/wallet/app-kit'
 import { Route as ApiMasterStatusRouteImport } from './routes/api/master/status'
+import { Route as ApiDebugX402RouteImport } from './routes/api/debug/x402'
 import { Route as ApiCronSettleBatchRouteImport } from './routes/api/cron/settle-batch'
 
 const AppRoute = AppRouteImport.update({
@@ -82,6 +83,11 @@ const ApiMasterStatusRoute = ApiMasterStatusRouteImport.update({
   path: '/api/master/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDebugX402Route = ApiDebugX402RouteImport.update({
+  id: '/api/debug/x402',
+  path: '/api/debug/x402',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCronSettleBatchRoute = ApiCronSettleBatchRouteImport.update({
   id: '/api/cron/settle-batch',
   path: '/api/cron/settle-batch',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
+  '/api/debug/x402': typeof ApiDebugX402Route
   '/api/master/status': typeof ApiMasterStatusRoute
   '/api/wallet/app-kit': typeof ApiWalletAppKitRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
+  '/api/debug/x402': typeof ApiDebugX402Route
   '/api/master/status': typeof ApiMasterStatusRoute
   '/api/wallet/app-kit': typeof ApiWalletAppKitRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/api/cron/settle-batch': typeof ApiCronSettleBatchRoute
+  '/api/debug/x402': typeof ApiDebugX402Route
   '/api/master/status': typeof ApiMasterStatusRoute
   '/api/wallet/app-kit': typeof ApiWalletAppKitRoute
   '/api/wallet/nanopayment': typeof ApiWalletNanopaymentRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/sign-in/$'
     | '/sign-up/$'
     | '/api/cron/settle-batch'
+    | '/api/debug/x402'
     | '/api/master/status'
     | '/api/wallet/app-kit'
     | '/api/wallet/nanopayment'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/sign-in/$'
     | '/sign-up/$'
     | '/api/cron/settle-batch'
+    | '/api/debug/x402'
     | '/api/master/status'
     | '/api/wallet/app-kit'
     | '/api/wallet/nanopayment'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/sign-in/$'
     | '/sign-up/$'
     | '/api/cron/settle-batch'
+    | '/api/debug/x402'
     | '/api/master/status'
     | '/api/wallet/app-kit'
     | '/api/wallet/nanopayment'
@@ -185,6 +197,7 @@ export interface RootRouteChildren {
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
   ApiCronSettleBatchRoute: typeof ApiCronSettleBatchRoute
+  ApiDebugX402Route: typeof ApiDebugX402Route
   ApiMasterStatusRoute: typeof ApiMasterStatusRoute
   ApiWalletAppKitRoute: typeof ApiWalletAppKitRoute
   ApiWalletNanopaymentRoute: typeof ApiWalletNanopaymentRoute
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMasterStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/debug/x402': {
+      id: '/api/debug/x402'
+      path: '/api/debug/x402'
+      fullPath: '/api/debug/x402'
+      preLoaderRoute: typeof ApiDebugX402RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cron/settle-batch': {
       id: '/api/cron/settle-batch'
       path: '/api/cron/settle-batch'
@@ -308,6 +328,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
   ApiCronSettleBatchRoute: ApiCronSettleBatchRoute,
+  ApiDebugX402Route: ApiDebugX402Route,
   ApiMasterStatusRoute: ApiMasterStatusRoute,
   ApiWalletAppKitRoute: ApiWalletAppKitRoute,
   ApiWalletNanopaymentRoute: ApiWalletNanopaymentRoute,

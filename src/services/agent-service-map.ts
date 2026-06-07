@@ -40,6 +40,16 @@ export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> =
   "crypto-research-b": 0.218,
 };
 
+/** Surf pays via Circle GatewayWalletBatched on Polygon — not Base exact x402. */
+export const GATEWAY_POLYGON_AGENT_IDS = new Set([
+  "surf-news",
+  "surf-tokenomics",
+]);
+
+export function agentUsesGatewayPolygonPay(agentServiceId: string): boolean {
+  return GATEWAY_POLYGON_AGENT_IDS.has(agentServiceId);
+}
+
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
 const DIRECT_X402_HOSTS = new Set([
   "api.messari.io",

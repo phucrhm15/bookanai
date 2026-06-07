@@ -69,12 +69,13 @@ export function formatPaymentErrorForUser(
     );
   }
 
-  if (MASTER_GATEWAY_USDC_RE.test(message) || /Master wallet|Ví Master thiếu USDC/i.test(message)) {
+  if (MASTER_GATEWAY_USDC_RE.test(message) || /Master wallet|Ví Master thiếu USDC|Gateway Polygon unavailable|Surf cần USDC trong Gateway/i.test(message)) {
     const addr = extractAddress(message);
     const needsPolygon = POLYGON_CONTEXT_RE.test(message);
     if (locale === "vi") {
       return (
-        `Hệ thống chưa đủ USDC để trả API cho agent (ví x402 của server, không phải ví Content Credits của bạn). ` +
+        `Hệ thống chưa đủ USDC Gateway Polygon để trả API Surf (ví master server, không phải Content Credits của bạn). ` +
+        `Content Credits đã được hoàn nếu bạn thấy dòng Refund trong lịch sử. ` +
         (addr
           ? needsPolygon
             ? `Admin nạp USDC + MATIC trên Polygon vào ${addr}, rồi chạy: npm run gateway:deposit -- 0.05 polygon`
@@ -85,7 +86,8 @@ export function formatPaymentErrorForUser(
       );
     }
     return (
-      "The server does not have enough USDC to pay the agent API (x402 master wallet, not your Content Credits). " +
+      "The server does not have enough Gateway USDC to pay Surf (Polygon master wallet, not your Content Credits). " +
+      "Credits were refunded if you see a Refund line in history. " +
       (addr
         ? needsPolygon
           ? `Admin: fund ${addr} with USDC + MATIC on Polygon, then run: npm run gateway:deposit -- 0.05 polygon`

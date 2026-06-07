@@ -170,6 +170,37 @@ export async function assertMasterBaseUsdcBalance(minUsdc: number): Promise<void
   return ensureMasterWalletUsdcOnBase(minUsdc);
 }
 
+/** Pre-flight for Surf — pays via GatewayWalletBatched on Polygon, not user Base prefund. */
+export async function assertMasterGatewayPolygonUsdc(minUsdc: number): Promise<void> {
+  const env = getServerEnv();
+  const privateKey = env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`;
+  let lastError: unknown;
+
+  for (const rpcUrl of polygonRpcCandidates()) {
+    const gateway = new GatewayClient({ chain: "polygon", privateKey, rpcUrl });
+    try {
+      await ensureGatewayLiquidity(gateway, "polygon", minUsdc);
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("fetch failed") || message.includes("NETWORK_ERROR")) {
+        console.warn(`[gateway] Polygon preflight retry next RPC after: ${message}`);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lastError instanceof CircleServiceError) throw lastError;
+  const depositor = masterDepositorAddress();
+  throw new CircleServiceError(
+    `Circle Gateway Polygon unavailable — Surf cần USDC trong Gateway + MATIC gas trên ví master ${depositor}. ` +
+      `Admin: npm run show:x402 → npm run gateway:deposit -- 0.05 polygon`,
+    "INSUFFICIENT_BALANCE",
+  );
+}
+
 async function resolveGatewayChainForResource(
   resourceUrl: string,
   privateKey: `0x${string}`,

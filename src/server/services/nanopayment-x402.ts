@@ -1,16 +1,13 @@
 /**
  * Iron-clad x402 nanopayment — Circle Agents Marketplace only.
  *
- * Protocol order:
- *  1. Discovery → resolve resource URL (Circle x402 catalog)
- *  2. Probe HTTP 402 → dynamic USDC price (never hardcoded UI price)
- *  3. SQLite ledger debit (exact agent price)
- *  4. User Circle wallet → x402 payer EOA on-chain (await)
- *  5. GatewayClient.pay(resourceUrl) → marketplace content
- *  6. Return content to UI
+ * Protocol order (exact x402 — Exa, Messari, Stack B):
+ *  3. SQLite debit → 4. User wallet → x402 payer (Base) → 5. master pays API
  *
- * On failure before on-chain transfer: SQLite refund.
- * On failure after on-chain transfer: no ledger refund (USDC already left user wallet).
+ * Gateway Polygon (Surf):
+ *  3. Pre-check master Gateway Polygon → 4. SQLite debit → 5. Gateway pay → 6. User → x402 (Base)
+ *
+ * On failure before user on-chain transfer: SQLite refund.
  */
 import { isSupportedChainId, type SupportedChainId } from "@/lib/chains";
 import { probeX402ResourcePrice } from "@/lib/x402-probe";
@@ -27,9 +24,16 @@ import { CircleServiceError } from "@/services/circle-errors";
 import {
   resolveAgentResource,
   STUDIO_AGENT_FALLBACK_PRICE_USDC,
+  agentUsesGatewayPolygonPay,
 } from "@/services/agent-service-map";
 import {
+  assertMasterGatewayPolygonUsdc,
+} from "@/server/services/x402-master-pay";
+import {
+  activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
+  processSettlementBatchForUser,
+  reserveOnchainSettlement,
   syncWalletCreditsForUser,
 } from "@/server/services/onchain-settlement";
 import { collectUserUsdcForX402 } from "@/server/services/user-x402-prefund";
@@ -229,6 +233,22 @@ export async function processNanopaymentX402(
     );
   }
 
+  const usesGatewayPolygon = agentUsesGatewayPolygonPay(agentServiceId);
+
+  if (usesGatewayPolygon) {
+    try {
+      await assertMasterGatewayPolygonUsdc(agentPriceUsdc);
+    } catch (error) {
+      if (error instanceof CircleServiceError) {
+        throw new CircleServiceError(
+          `${error.message} Content Credits của bạn đủ — lỗi ở ví Gateway Polygon của server (Surf).`,
+          error.code ?? "INSUFFICIENT_BALANCE",
+        );
+      }
+      throw error;
+    }
+  }
+
   let debited = false;
   let debitedAmount = 0;
   let ledgerEntryId: string | undefined;
@@ -246,15 +266,17 @@ export async function processNanopaymentX402(
     debited = true;
     debitedAmount = agentPriceUsdc;
 
-    const prefund = await collectUserUsdcForX402({
-      clerkId,
-      userWalletId,
-      ledgerEntryId,
-      amountUsdc: agentPriceUsdc,
-      targetChainId: targetChainId as SupportedChainId,
-    });
-    userPrefunded = true;
-    onChainSettlementQueuedId = prefund.settlementId;
+    if (!usesGatewayPolygon) {
+      const prefund = await collectUserUsdcForX402({
+        clerkId,
+        userWalletId,
+        ledgerEntryId,
+        amountUsdc: agentPriceUsdc,
+        targetChainId: targetChainId as SupportedChainId,
+      });
+      userPrefunded = true;
+      onChainSettlementQueuedId = prefund.settlementId;
+    }
 
     const response = await settleWithMasterAgentBounded(
       resourceUrl,
@@ -277,6 +299,35 @@ export async function processNanopaymentX402(
         : JSON.stringify(response.data ?? {});
 
     assertAgentResponseUsable(response.data, bodyText);
+
+    if (usesGatewayPolygon) {
+      try {
+        const prefund = await collectUserUsdcForX402({
+          clerkId,
+          userWalletId,
+          ledgerEntryId,
+          amountUsdc: agentPriceUsdc,
+          targetChainId: targetChainId as SupportedChainId,
+        });
+        onChainSettlementQueuedId = prefund.settlementId;
+        userPrefunded = true;
+      } catch (transferErr) {
+        console.warn("[x402] Surf post-pay user→x402 transfer failed, queue batch:", transferErr);
+        onChainSettlementQueuedId = reserveOnchainSettlement({
+          ledgerEntryId,
+          userId: clerkId,
+          circleWalletId: userWalletId,
+          amountUsdc: agentPriceUsdc,
+          targetChainId: targetChainId as SupportedChainId,
+        });
+        activateOnchainSettlement(onChainSettlementQueuedId);
+        try {
+          await processSettlementBatchForUser(clerkId);
+        } catch (batchErr) {
+          console.warn("[x402] Surf settlement batch failed (retry on Wallet sync):", batchErr);
+        }
+      }
+    }
 
     const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
 
@@ -312,7 +363,10 @@ export async function processNanopaymentX402(
     if (debited && debitedAmount > 0 && !userPrefunded) {
       try {
         userStore.credit(clerkId, debitedAmount, ledgerLabelRefundX402(agentServiceId));
-        console.warn(`[x402] SQLite refund ${debitedAmount} USDC for clerkId=${clerkId}`);
+        console.warn(
+          `[x402] SQLite refund ${debitedAmount} USDC for clerkId=${clerkId}` +
+            (usesGatewayPolygon ? " (Surf Gateway failed — user not charged on-chain)" : ""),
+        );
       } catch (rollbackError) {
         console.error("[x402] SQLite refund failed:", rollbackError);
       }

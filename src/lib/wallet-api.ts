@@ -50,6 +50,16 @@ export type NanopaymentApiResponse = {
   paymentRequiredObserved?: boolean;
   onChainSettlementTxId?: string;
   onChainSettlementQueuedId?: string;
+  arcOnChainMemo?: {
+    v: 1;
+    type: string;
+    app: string;
+    ledger?: string;
+    agent?: string;
+    settle?: string;
+    batch?: string;
+  };
+  arcTestnetGateway?: boolean;
 };
 
 const apiFetch = (input: string, init?: RequestInit) =>

@@ -1,4 +1,6 @@
 /** Parse x402 HTTP 402 PAYMENT-REQUIRED header → USDC price for a chain. */
+import { ARC_CHAIN_ID } from "@/lib/chains";
+
 export type X402ProbeInit = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   headers?: Record<string, string>;
@@ -53,13 +55,13 @@ export function priceUsdcFromDiscoveryAccepts(
   }
 }
 
-/** Prefer caller chain, then Base / Polygon / Ethereum mainnet catalog prices. */
+/** Prefer caller chain, then Arc Testnet, Base, Polygon, Ethereum catalog prices. */
 export function priceUsdcFromDiscoveryAnyChain(
   accepts: PaymentAccept[] | undefined,
   preferredChainId: number,
 ): { priceUsdc: number; chainId: number } | null {
   const chainOrder = Array.from(
-    new Set([preferredChainId, 8453, 137, 1].filter((id) => Number.isFinite(id))),
+    new Set([preferredChainId, ARC_CHAIN_ID, 8453, 137, 1].filter((id) => Number.isFinite(id))),
   );
   for (const chainId of chainOrder) {
     const priceUsdc = priceUsdcFromDiscoveryAccepts(accepts, chainId);

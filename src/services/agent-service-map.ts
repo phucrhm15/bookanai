@@ -46,6 +46,15 @@ export const GATEWAY_POLYGON_AGENT_IDS = new Set([
   "surf-tokenomics",
 ]);
 
+/** Re-export Arc Testnet agent gateway — register agent ids when they ship on Arc x402. */
+export {
+  ARC_TESTNET_AGENT_IDS,
+  agentPrefersArcTestnet,
+  agentAcceptsArcTestnet,
+  resolveAgentPaymentChain,
+  arcTestnetGatewayReady,
+} from "@/lib/arc-agent-network";
+
 export function agentUsesGatewayPolygonPay(agentServiceId: string): boolean {
   return GATEWAY_POLYGON_AGENT_IDS.has(agentServiceId);
 }

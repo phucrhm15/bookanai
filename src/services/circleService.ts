@@ -302,6 +302,10 @@ export type NanopaymentResult = {
   onChainSettlementTxId?: string;
   /** Queued batched settlement id (on-chain transfer runs async) */
   onChainSettlementQueuedId?: string;
+  /** Arc v0.7.2 on-chain memo payload (when settled on Arc Testnet). */
+  arcOnChainMemo?: import("@/lib/arc-transaction-extensions").ArcNanopaymentMemo;
+  /** True when agent accepts eip155:5042002 and is routable via Arc gateway. */
+  arcTestnetGateway?: boolean;
 };
 
 async function settleWithMasterAgent(

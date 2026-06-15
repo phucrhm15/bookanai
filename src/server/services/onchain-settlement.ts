@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { SupportedChainId } from "@/lib/chains";
+import { ARC_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
+import { buildArcNanopaymentMemo } from "@/lib/arc-transaction-extensions";
 import { getDb } from "@/server/db/client";
-import { pendingOnchainSettlements } from "@/server/db/schema";
+import { ledgerEntries, pendingOnchainSettlements } from "@/server/db/schema";
 import { ledgerLabelRefundHold, ledgerLabelRefundPending } from "@/server/ledger-label-keys";
 import { microToUsdc, usdcToMicro } from "@/server/db/usdc";
-import { executeUserToMasterTransfer } from "@/server/services/usdc-transfer";
+import { executeUserToMasterTransfer, executeArcBatchMemoTransfers } from "@/server/services/usdc-transfer";
+import { getMasterX402DepositorAddress } from "@/server/services/x402-master-pay";
 
 const BATCH_LIMIT = 20;
 const MAX_ATTEMPTS = 5;
@@ -320,18 +322,174 @@ async function processSettlementRows(
     details: [],
   };
 
-  for (const row of pending) {
+  const submitted = pending.filter((row) => row.status === "submitted" && row.circleTransactionId);
+  for (const row of submitted) {
     result.processed++;
-    const now = new Date();
+    result.details.push({
+      id: row.id,
+      status: "submitted",
+      circleTransactionId: row.circleTransactionId!,
+    });
+  }
 
-    if (row.status === "submitted" && row.circleTransactionId) {
-      result.details.push({
-        id: row.id,
-        status: "submitted",
-        circleTransactionId: row.circleTransactionId,
-      });
+  const actionable = pending.filter(
+    (row) => !(row.status === "submitted" && row.circleTransactionId),
+  );
+
+  const arcRows = actionable.filter((row) => row.targetChainId === ARC_CHAIN_ID);
+  const baseRows = actionable.filter((row) => row.targetChainId !== ARC_CHAIN_ID);
+
+  await processArcSettlementBatches(db, arcRows, result);
+  await processSequentialSettlements(db, baseRows, result);
+
+  return result;
+}
+
+async function processArcSettlementBatches(
+  db: ReturnType<typeof getDb>,
+  arcRows: (typeof pendingOnchainSettlements.$inferSelect)[],
+  result: BatchSettlementResult,
+): Promise<void> {
+  if (arcRows.length === 0) return;
+
+  const byWallet = new Map<string, (typeof pendingOnchainSettlements.$inferSelect)[]>();
+  for (const row of arcRows) {
+    const list = byWallet.get(row.circleWalletId) ?? [];
+    list.push(row);
+    byWallet.set(row.circleWalletId, list);
+  }
+
+  const x402Payer = getMasterX402DepositorAddress() as `0x${string}`;
+
+  for (const [walletId, rows] of byWallet) {
+    const chunk = rows.slice(0, BATCH_LIMIT);
+    result.processed += chunk.length;
+
+    if (chunk.length === 1) {
+      await processSingleArcSettlement(db, chunk[0]!, result);
       continue;
     }
+
+    const batchId = `arc-batch-${randomUUID()}`;
+    const now = new Date();
+
+    try {
+      const items = chunk.map((row) => {
+        const ledger = db
+          .select({ agentId: ledgerEntries.agentId })
+          .from(ledgerEntries)
+          .where(eq(ledgerEntries.id, row.ledgerEntryId))
+          .get();
+
+        return {
+          destinationAddress: x402Payer,
+          amountUsdc: microToUsdc(row.amountMicroUsdc),
+          memo: buildArcNanopaymentMemo({
+            type: "batch",
+            ledgerEntryId: row.ledgerEntryId,
+            agentId: ledger?.agentId ?? undefined,
+            settlementId: row.id,
+            batchId,
+          }),
+        };
+      });
+
+      const circleTransactionId = await executeArcBatchMemoTransfers(walletId, items, batchId);
+
+      for (const row of chunk) {
+        db.update(pendingOnchainSettlements)
+          .set({
+            status: "complete",
+            circleTransactionId,
+            batchId,
+            updatedAt: now,
+          })
+          .where(eq(pendingOnchainSettlements.id, row.id))
+          .run();
+
+        result.completed++;
+        result.details.push({ id: row.id, status: "complete", circleTransactionId });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const row of chunk) {
+        const attempts = row.attempts + 1;
+        const failed = attempts >= MAX_ATTEMPTS;
+        db.update(pendingOnchainSettlements)
+          .set({
+            status: failed ? "failed" : "pending",
+            attempts,
+            lastError: message.slice(0, 500),
+            updatedAt: now,
+          })
+          .where(eq(pendingOnchainSettlements.id, row.id))
+          .run();
+        if (failed) result.failed++;
+        result.details.push({ id: row.id, status: failed ? "failed" : "pending", error: message });
+      }
+    }
+  }
+}
+
+async function processSingleArcSettlement(
+  db: ReturnType<typeof getDb>,
+  row: typeof pendingOnchainSettlements.$inferSelect,
+  result: BatchSettlementResult,
+): Promise<void> {
+  const now = new Date();
+  const ledger = db
+    .select({ agentId: ledgerEntries.agentId })
+    .from(ledgerEntries)
+    .where(eq(ledgerEntries.id, row.ledgerEntryId))
+    .get();
+
+  try {
+    const circleTransactionId = await executeUserToMasterTransfer(
+      row.circleWalletId,
+      microToUsdc(row.amountMicroUsdc),
+      ARC_CHAIN_ID,
+      {
+        ledgerEntryId: row.ledgerEntryId,
+        agentId: ledger?.agentId ?? undefined,
+        settlementId: row.id,
+      },
+    );
+
+    db.update(pendingOnchainSettlements)
+      .set({ status: "complete", circleTransactionId, updatedAt: now })
+      .where(eq(pendingOnchainSettlements.id, row.id))
+      .run();
+
+    result.completed++;
+    result.details.push({ id: row.id, status: "complete", circleTransactionId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const attempts = row.attempts + 1;
+    const failed = attempts >= MAX_ATTEMPTS;
+
+    db.update(pendingOnchainSettlements)
+      .set({
+        status: failed ? "failed" : "pending",
+        attempts,
+        lastError: message.slice(0, 500),
+        updatedAt: now,
+      })
+      .where(eq(pendingOnchainSettlements.id, row.id))
+      .run();
+
+    if (failed) result.failed++;
+    result.details.push({ id: row.id, status: failed ? "failed" : "pending", error: message });
+  }
+}
+
+async function processSequentialSettlements(
+  db: ReturnType<typeof getDb>,
+  rows: (typeof pendingOnchainSettlements.$inferSelect)[],
+  result: BatchSettlementResult,
+): Promise<void> {
+  for (const row of rows) {
+    result.processed++;
+    const now = new Date();
 
     try {
       const circleTransactionId = await executeUserToMasterTransfer(
@@ -370,8 +528,6 @@ async function processSettlementRows(
       result.details.push({ id: row.id, status: failed ? "failed" : "pending", error: message });
     }
   }
-
-  return result;
 }
 
 export async function syncWalletCreditsForUser(

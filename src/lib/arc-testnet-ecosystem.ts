@@ -1,4 +1,8 @@
 import { ARC_CHAIN_ID, ARC_USDC_CONTRACT_ADDRESS } from "@/lib/chains";
+import {
+  ARC_MEMO_CONTRACT_ADDRESS,
+  ARC_MULTICALL3_FROM_ADDRESS,
+} from "@/lib/arc-transaction-extensions";
 
 /** EIP-3089 params for wallet_addEthereumChain (Arc Testnet). */
 export const ARC_WALLET_CHAIN_PARAMS = {
@@ -89,6 +93,12 @@ export const ARC_NETWORK_FACTS = {
   usdcContract: ARC_USDC_CONTRACT_ADDRESS,
   eurcContract: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
   cctpDomain: 26,
+  /** Arc v0.7.2 — transaction memos (Zero7 hardfork). */
+  memoContract: ARC_MEMO_CONTRACT_ADDRESS,
+  /** Arc v0.7.2 — batched transactions preserving msg.sender. */
+  multicall3FromContract: ARC_MULTICALL3_FROM_ADDRESS,
+  hardforkVersion: "v0.7.2",
+  hardforkActivationUtc: "2026-06-18T12:00:00Z",
 } as const;
 
 export function arcExplorerAddressUrl(address: string): string {

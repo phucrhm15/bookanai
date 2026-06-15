@@ -30,8 +30,9 @@ export async function collectUserUsdcForX402(params: {
   ledgerEntryId: string;
   amountUsdc: number;
   targetChainId: SupportedChainId;
+  agentId?: string;
 }): Promise<CollectUserUsdcResult> {
-  const { clerkId, userWalletId, ledgerEntryId, amountUsdc, targetChainId } = params;
+  const { clerkId, userWalletId, ledgerEntryId, amountUsdc, targetChainId, agentId } = params;
 
   if (amountUsdc <= 0) {
     throw new CircleServiceError("collectUserUsdcForX402: amount must be positive", "SETTLEMENT_FAILED");
@@ -64,6 +65,11 @@ export async function collectUserUsdcForX402(params: {
       userWalletId,
       amountUsdc,
       targetChainId,
+      {
+        ledgerEntryId,
+        agentId,
+        settlementId,
+      },
     );
     completeOnchainSettlementPrefunded(settlementId, circleTransactionId);
     console.info(

@@ -10,6 +10,8 @@
  * On failure before user on-chain transfer: SQLite refund.
  */
 import { isSupportedChainId, type SupportedChainId } from "@/lib/chains";
+import { resolveAgentPaymentChain, arcTestnetGatewayReady } from "@/lib/arc-agent-network";
+import { buildArcNanopaymentMemo, isArcChain } from "@/lib/arc-transaction-extensions";
 import { probeX402ResourcePrice } from "@/lib/x402-probe";
 import { extractX402MarketplaceContent } from "@/lib/x402-content";
 import { ledgerLabelRefundX402, ledgerLabelX402 } from "@/server/ledger-label-keys";
@@ -168,6 +170,8 @@ export async function processNanopaymentX402(
     );
   }
 
+  let paymentChainId = targetChainId as SupportedChainId;
+
   const walletRow = userStore.getByWalletId(userWalletId);
   if (!walletRow || walletRow.userId !== clerkId) {
     throw new CircleServiceError(`Unknown user wallet id: ${userWalletId}`, "WALLET_NOT_FOUND");
@@ -180,13 +184,28 @@ export async function processNanopaymentX402(
     return processResearchStackB(
       clerkId,
       userWalletId,
-      targetChainId,
+      paymentChainId,
       prompt,
       idempotencyKey,
     );
   }
 
   const { resourceUrl: mappedUrl, discoveryItem } = await resolveAgentResource(agentServiceId);
+  const resolvedChain = resolveAgentPaymentChain({
+    apiKey: (await import("@/server/config/env")).getServerEnv().CIRCLE_API_KEY,
+    agentServiceId,
+    accepts: discoveryItem.accepts,
+    requestedChainId: paymentChainId,
+  });
+
+  if (resolvedChain !== paymentChainId) {
+    console.info(
+      `[x402] Chain routed ${paymentChainId} → ${resolvedChain} for ${agentServiceId}` +
+        (arcTestnetGatewayReady(agentServiceId, discoveryItem.accepts) ? " (Arc gateway)" : ""),
+    );
+    paymentChainId = resolvedChain;
+  }
+
   const resourceUrl = withAgentResourceQuery(agentServiceId, mappedUrl, prompt);
   console.info(`[x402] Discovery resource for ${agentServiceId}: ${resourceUrl}`);
 
@@ -203,7 +222,7 @@ export async function processNanopaymentX402(
   try {
     probe = await probeX402ResourcePrice(
       mappedUrl,
-      targetChainId,
+      paymentChainId,
       discoveryItem.accepts,
       probeInit,
     );
@@ -272,7 +291,8 @@ export async function processNanopaymentX402(
         userWalletId,
         ledgerEntryId,
         amountUsdc: agentPriceUsdc,
-        targetChainId: targetChainId as SupportedChainId,
+        targetChainId: paymentChainId,
+        agentId: agentServiceId,
       });
       userPrefunded = true;
       onChainSettlementQueuedId = prefund.settlementId;
@@ -280,7 +300,7 @@ export async function processNanopaymentX402(
 
     const response = await settleWithMasterAgentBounded(
       resourceUrl,
-      targetChainId as SupportedChainId,
+      paymentChainId,
       agentPriceUsdc,
       payOptionsForAgent(agentServiceId, prompt),
     );
@@ -307,7 +327,8 @@ export async function processNanopaymentX402(
           userWalletId,
           ledgerEntryId,
           amountUsdc: agentPriceUsdc,
-          targetChainId: targetChainId as SupportedChainId,
+          targetChainId: paymentChainId,
+          agentId: agentServiceId,
         });
         onChainSettlementQueuedId = prefund.settlementId;
         userPrefunded = true;
@@ -318,7 +339,7 @@ export async function processNanopaymentX402(
           userId: clerkId,
           circleWalletId: userWalletId,
           amountUsdc: agentPriceUsdc,
-          targetChainId: targetChainId as SupportedChainId,
+          targetChainId: paymentChainId,
         });
         activateOnchainSettlement(onChainSettlementQueuedId);
         try {
@@ -331,10 +352,19 @@ export async function processNanopaymentX402(
 
     const refreshed = await getUnifiedBalance(userWalletId).catch(() => unified);
 
+    const arcOnChainMemo =
+      ledgerEntryId && isArcChain(paymentChainId)
+        ? buildArcNanopaymentMemo({
+            ledgerEntryId,
+            agentId: agentServiceId,
+            settlementId: onChainSettlementQueuedId,
+          })
+        : undefined;
+
     return {
       agentServiceId,
       resourceUrl,
-      targetChainId,
+      targetChainId: paymentChainId,
       chargedUsdc: agentPriceUsdc,
       ledgerBalance: updated.ledgerBalance,
       unifiedBalance: refreshed.totalUsdc,
@@ -344,6 +374,8 @@ export async function processNanopaymentX402(
       generatedContent: extractX402MarketplaceContent(bodyText),
       paymentRequiredObserved: probe.paymentRequired,
       onChainSettlementQueuedId,
+      arcOnChainMemo,
+      arcTestnetGateway: arcTestnetGatewayReady(agentServiceId, discoveryItem.accepts),
     };
   } catch (error) {
     if (error instanceof UserStoreError) {

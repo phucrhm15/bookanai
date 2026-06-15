@@ -2,11 +2,23 @@ import { randomUUID } from "node:crypto";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
 import type { TransactionState } from "@circle-fin/developer-controlled-wallets";
 import {
+  ARC_CHAIN_ID,
   ARC_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
   BASE_NETWORK,
   type SupportedChainId,
 } from "@/lib/chains";
+import {
+  ARC_MEMO_CONTRACT_ADDRESS,
+  ARC_MULTICALL3_FROM_ADDRESS,
+  arcExtensionsActive,
+  buildArcNanopaymentMemo,
+  encodeArcBatchAggregate3ValueCalldata,
+  encodeArcMemoBytes,
+  formatNativeUsdcForDcw,
+  type ArcBatchTransferItem,
+  type ArcNanopaymentMemo,
+} from "@/lib/arc-transaction-extensions";
 import { dcwBlockchainForPaymentChain } from "@/lib/circle-dcw-blockchains";
 import {
   ONCHAIN_TRANSFER_POLL_INTERVAL_MS,
@@ -82,18 +94,142 @@ async function pollTransferUntilTerminal(transactionId: string): Promise<void> {
   );
 }
 
+async function submitDcwContractExecution(input: {
+  walletId: string;
+  contractAddress: string;
+  refId: string;
+  nativeAmountUsdc?: number;
+  abiFunctionSignature?: string;
+  abiParameters?: string[];
+  callData?: `0x${string}`;
+}): Promise<string> {
+  const client = getTransferClient();
+  let createResponse;
+  try {
+    createResponse = await client.createContractExecutionTransaction({
+      walletId: input.walletId,
+      contractAddress: input.contractAddress,
+      ...(input.callData
+        ? { callData: input.callData }
+        : {
+            abiFunctionSignature: input.abiFunctionSignature!,
+            abiParameters: input.abiParameters!,
+          }),
+      ...(input.nativeAmountUsdc != null && input.nativeAmountUsdc > 0
+        ? { amount: formatNativeUsdcForDcw(input.nativeAmountUsdc) }
+        : {}),
+      fee: {
+        type: "level",
+        config: { feeLevel: "MEDIUM" },
+      },
+      idempotencyKey: randomUUID(),
+      refId: input.refId,
+    });
+  } catch (error) {
+    throw new CircleServiceError(
+      `Arc contract execution failed: ${formatCircleApiError(error)}`,
+      "SETTLEMENT_FAILED",
+    );
+  }
+
+  const transactionId = createResponse.data?.id;
+  if (!transactionId) {
+    throw new CircleServiceError(
+      "Circle createContractExecutionTransaction did not return a transaction id",
+      "SETTLEMENT_FAILED",
+    );
+  }
+
+  await pollTransferUntilTerminal(transactionId);
+  return transactionId;
+}
+
+export type ArcTransferMemoContext = {
+  ledgerEntryId: string;
+  agentId?: string;
+  settlementId?: string;
+  batchId?: string;
+};
+
+async function executeArcMemoTransfer(
+  userWalletId: string,
+  amountUsdc: number,
+  destinationAddress: `0x${string}`,
+  memoContext: ArcTransferMemoContext,
+): Promise<string> {
+  const memo = buildArcNanopaymentMemo({
+    ledgerEntryId: memoContext.ledgerEntryId,
+    agentId: memoContext.agentId,
+    settlementId: memoContext.settlementId,
+    batchId: memoContext.batchId,
+  });
+
+  return submitDcwContractExecution({
+    walletId: userWalletId,
+    contractAddress: ARC_MEMO_CONTRACT_ADDRESS,
+    abiFunctionSignature: "sendWithMemo(address,uint256,bytes)",
+    abiParameters: [
+      destinationAddress,
+      usdcToErc20AtomicString(amountUsdc),
+      encodeArcMemoBytes(memo),
+    ],
+    nativeAmountUsdc: amountUsdc,
+    refId: `bookanai-arc-memo-${memoContext.ledgerEntryId}`,
+  });
+}
+
+function usdcToErc20AtomicString(amountUsdc: number): string {
+  return Math.round(amountUsdc * 1_000_000).toString();
+}
+
+/** Arc v0.7.2 — batch multiple memo transfers in one Multicall3From transaction. */
+export async function executeArcBatchMemoTransfers(
+  userWalletId: string,
+  items: ArcBatchTransferItem[],
+  batchId: string,
+): Promise<string> {
+  if (items.length === 0) {
+    throw new CircleServiceError("Arc batch transfer: empty items", "SETTLEMENT_FAILED");
+  }
+
+  const { callData, totalNativeWei } = encodeArcBatchAggregate3ValueCalldata(
+    items.map((item) => ({
+      ...item,
+      memo: {
+        ...item.memo,
+        batch: batchId,
+      },
+    })),
+  );
+
+  const totalUsdc = items.reduce((sum, i) => sum + i.amountUsdc, 0);
+
+  return submitDcwContractExecution({
+    walletId: userWalletId,
+    contractAddress: ARC_MULTICALL3_FROM_ADDRESS,
+    callData,
+    nativeAmountUsdc: Number(totalNativeWei) / 1e18,
+    refId: `bookanai-arc-batch-${batchId}`,
+  });
+}
+
 export async function executeUserToMasterTransfer(
   userWalletId: string,
   amountUsdc: number,
   targetChainId: SupportedChainId,
+  memoContext?: ArcTransferMemoContext,
 ): Promise<string> {
   const user = userStore.getByWalletId(userWalletId);
   if (!user) {
     throw new CircleServiceError(`Unknown user wallet id: ${userWalletId}`, "WALLET_NOT_FOUND");
   }
 
-  /** Reimburse the x402 payer EOA (MASTER_AGENT_PRIVATE_KEY), not Circle DCW master. */
-  const x402PayerAddress = getMasterX402DepositorAddress();
+  const x402PayerAddress = getMasterX402DepositorAddress() as `0x${string}`;
+
+  if (arcExtensionsActive(targetChainId) && memoContext) {
+    return executeArcMemoTransfer(userWalletId, amountUsdc, x402PayerAddress, memoContext);
+  }
+
   const tokenAddress =
     targetChainId === BASE_NETWORK.id ? BASE_USDC_CONTRACT_ADDRESS : ARC_USDC_CONTRACT_ADDRESS;
   const blockchain = dcwBlockchainForPaymentChain(targetChainId);
@@ -112,7 +248,9 @@ export async function executeUserToMasterTransfer(
         config: { feeLevel: "MEDIUM" },
       },
       idempotencyKey: randomUUID(),
-      refId: `bookanai-nanopay-${Date.now()}`,
+      refId: memoContext
+        ? `bookanai-nanopay-${memoContext.ledgerEntryId}`
+        : `bookanai-nanopay-${Date.now()}`,
     });
   } catch (error) {
     throw new CircleServiceError(
@@ -132,3 +270,9 @@ export async function executeUserToMasterTransfer(
   await pollTransferUntilTerminal(transactionId);
   return transactionId;
 }
+
+export function isArcTransferChain(chainId: SupportedChainId): boolean {
+  return chainId === ARC_CHAIN_ID;
+}
+
+export type { ArcNanopaymentMemo, ArcBatchTransferItem };

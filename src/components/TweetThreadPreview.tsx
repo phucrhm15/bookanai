@@ -86,95 +86,7 @@ function pickString(obj: JsonRecord, keys: string[]): string | undefined {
   return undefined;
 }
 
-function formatUsd(value: unknown): string | undefined {
-  if (value === null || value === undefined) return undefined;
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return typeof value === "string" ? value : undefined;
-  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(2)}K`;
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
-}
-
-function extractMessariRows(data: unknown): JsonRecord[] {
-  if (Array.isArray(data)) {
-    return data.map(asRecord).filter((r): r is JsonRecord => r !== null);
-  }
-  const root = asRecord(data);
-  if (!root) return [];
-  const nested = root.data;
-  if (Array.isArray(nested)) {
-    return nested.map(asRecord).filter((r): r is JsonRecord => r !== null);
-  }
-  const single = asRecord(nested);
-  return single ? [single] : [root];
-}
-
 type TFn = (key: string, params?: TranslateParams) => string;
-
-function messariAthLine(row: JsonRecord, t: TFn): string | undefined {
-  const ath = asRecord(row.allTimeHigh) ?? row;
-  const athPrice = formatUsd(
-    ath.allTimeHigh ??
-      ath.price ??
-      row.price ??
-      row.price_usd ??
-      row.current_price,
-  );
-  const athDate = pickString(ath, ["allTimeHighDate", "date", "athDate"]);
-  const pctDown =
-    ath.percentDownFromAllTimeHigh ??
-    ath.allTimeHighPercentDown ??
-    row.percentDownFromAllTimeHigh;
-  const pctStr =
-    pctDown != null && Number.isFinite(Number(pctDown))
-      ? t("thread.messariAthDown", { pct: Number(pctDown).toFixed(1) })
-      : undefined;
-
-  const bits: string[] = [];
-  if (athPrice) bits.push(`ATH: ${athPrice}`);
-  if (athDate) bits.push(`(${athDate.slice(0, 10)})`);
-  if (pctStr) bits.push(pctStr);
-  return bits.length ? bits.join(" ") : undefined;
-}
-
-/** Format raw Messari JSON into a postable market-update block. */
-function formatMessariData(data: unknown, t: TFn): string {
-  const rows = extractMessariRows(data).slice(0, 8);
-  if (!rows.length) {
-    return t("thread.messariEmpty");
-  }
-
-  const lines: string[] = [t("thread.messariHeader"), t("thread.messariHint"), ""];
-
-  for (const row of rows) {
-    const name =
-      pickString(row, ["name", "symbol", "slug", "id", "asset"])?.toUpperCase() ?? "TOKEN";
-    const price = formatUsd(
-      row.price ??
-        row.price_usd ??
-        row.current_price ??
-        row.market_price_usd ??
-        row.close,
-    );
-    const volume = formatUsd(
-      row.volume ?? row.volume_24h ?? row.volume24h ?? row.trading_volume_24h,
-    );
-    const marketcap = formatUsd(
-      row.marketcap ?? row.market_cap ?? row.market_cap_usd ?? row.marketcap_usd,
-    );
-    const athLine = messariAthLine(row, t);
-
-    lines.push(`**${name}**`);
-    if (price) lines.push(`• ${t("thread.messariPrice", { price })}`);
-    if (athLine) lines.push(`• ${athLine}`);
-    if (volume) lines.push(`• ${t("thread.messariVol", { vol: volume })}`);
-    if (marketcap) lines.push(`• ${t("thread.messariMcap", { mcap: marketcap })}`);
-    lines.push("");
-  }
-
-  return lines.join("\n").trim();
-}
 
 /** Format raw Perplexity / search JSON into a macro-news block. */
 function formatPerplexityData(data: unknown, t: TFn): string {
@@ -235,10 +147,10 @@ function formatPerplexityData(data: unknown, t: TFn): string {
   return `${header}\n${JSON.stringify(root, null, 2).slice(0, 2000)}`;
 }
 
-/** Format Surf feed/tokenomics payloads into short postable bullets. */
-function formatSurfData(data: unknown, t: TFn, tokenomics = false): string {
-  const header = tokenomics ? t("thread.surfTokenomicsHeader") : t("thread.surfHeader");
-  const empty = tokenomics ? t("thread.surfTokenomicsEmpty") : t("thread.surfEmpty");
+/** Format Surf news feed into short postable bullets. */
+function formatSurfData(data: unknown, t: TFn): string {
+  const header = t("thread.surfHeader");
+  const empty = t("thread.surfEmpty");
   const root = asRecord(data);
   if (!root) {
     return typeof data === "string" ? `${header}\n${data}` : empty;
@@ -277,21 +189,23 @@ function formatSurfData(data: unknown, t: TFn, tokenomics = false): string {
 export function parseAgentData(agentId: string, rawResponse: string, t: TFn): string {
   const trimmed = rawResponse.trim();
   if (!trimmed) {
-    return agentId === "messari-analyst"
-      ? `${t("thread.messariHeader")}\n${t("thread.responseEmpty")}`
-      : agentId === "surf-news"
-        ? `${t("thread.surfHeader")}\n${t("thread.responseEmpty")}`
-        : agentId === "surf-tokenomics"
-          ? `${t("thread.surfTokenomicsHeader")}\n${t("thread.responseEmpty")}`
-        : `${t("thread.perplexityHeader")}\n${t("thread.responseEmpty")}`;
+    if (agentId === "surf-news" || agentId === "arc-market-pulse") {
+      return `${t("thread.surfHeader")}\n${t("thread.responseEmpty")}`;
+    }
+    if (agentId === "arc-sonar-brief") {
+      return `${t("thread.perplexityHeader")}\n${t("thread.responseEmpty")}`;
+    }
+    return `${t("thread.perplexityHeader")}\n${t("thread.responseEmpty")}`;
   }
 
   try {
     const parsed: unknown = JSON.parse(trimmed);
-    if (agentId === "messari-analyst") return formatMessariData(parsed, t);
-    if (agentId === "perplexity-social") return formatPerplexityData(parsed, t);
-    if (agentId === "surf-news") return formatSurfData(parsed, t);
-    if (agentId === "surf-tokenomics") return formatSurfData(parsed, t, true);
+    if (agentId === "perplexity-social" || agentId === "arc-sonar-brief") {
+      return formatPerplexityData(parsed, t);
+    }
+    if (agentId === "surf-news" || agentId === "arc-market-pulse") {
+      return formatSurfData(parsed, t);
+    }
     if (agentId === "crypto-research-b" && isStackBReport(parsed)) {
       return formatStackBForDisplay(parsed);
     }

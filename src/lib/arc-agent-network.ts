@@ -1,9 +1,9 @@
 /**
  * Arc Testnet agent network gateway — auto-select payment chain from x402 accepts.
- * Register agent ids in ARC_TESTNET_AGENT_IDS when they list eip155:5042002.
+ * Register agent ids in ARC_TESTNET_AGENT_IDS for Arc-branded Studio agents.
  */
 import { ARC_CHAIN_ID, BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
-import { defaultPaymentChainId } from "@/lib/circle-dcw-blockchains";
+import { defaultPaymentChainId, isLiveCircleApiKey } from "@/lib/circle-dcw-blockchains";
 import { priceUsdcFromDiscoveryAccepts } from "@/lib/x402-probe";
 
 export type X402NetworkAccept = {
@@ -14,11 +14,12 @@ export type X402NetworkAccept = {
 };
 
 /**
- * Agents explicitly routed to Arc Testnet (add ids as Circle Discovery lists them).
- * Empty registry is fine — accepts metadata still drives auto-detection.
+ * Agents explicitly routed to Arc Testnet UX / settlement preference.
+ * LIVE Circle API keys cannot create Arc DCW wallets — settlement falls back to Base.
  */
 export const ARC_TESTNET_AGENT_IDS = new Set<string>([
-  // e.g. "my-arc-agent": register here when live on Arc Testnet x402
+  "arc-market-pulse",
+  "arc-sonar-brief",
 ]);
 
 export function agentAcceptsArcTestnet(accepts?: X402NetworkAccept[]): boolean {
@@ -46,9 +47,9 @@ export function agentPrefersArcTestnet(
 }
 
 /**
- * Pick the chain for x402 nanopayment.
- * - TEST API key → Arc Testnet when agent accepts it (or is registered).
- * - LIVE API key → Base when agent accepts it; Arc only if explicitly registered.
+ * Pick the chain for x402 nanopayment / user→master settlement.
+ * - TEST API key → Arc Testnet for Arc agents (and when Discovery lists eip155:5042002).
+ * - LIVE API key → Base only (Circle DCW cannot mix LIVE + ARC-TESTNET).
  */
 export function resolveAgentPaymentChain(input: {
   apiKey: string;
@@ -58,13 +59,25 @@ export function resolveAgentPaymentChain(input: {
 }): SupportedChainId {
   const { apiKey, agentServiceId, accepts, requestedChainId } = input;
   const envDefault = defaultPaymentChainId(apiKey);
-  const live = apiKey.startsWith("LIVE_API_KEY");
+  const live = isLiveCircleApiKey(apiKey);
+  const prefersArc = agentPrefersArcTestnet(agentServiceId, accepts);
+
+  // LIVE keys: Circle rejects ARC-TESTNET wallets → always settle on Base.
+  if (live) {
+    if (requestedChainId === BASE_CHAIN_ID) return BASE_CHAIN_ID;
+    return BASE_CHAIN_ID;
+  }
+
+  // TEST keys: Arc-registered agents default to Arc Testnet.
+  if (prefersArc) {
+    return ARC_CHAIN_ID;
+  }
 
   const candidates: SupportedChainId[] = [];
   if (requestedChainId === BASE_CHAIN_ID || requestedChainId === ARC_CHAIN_ID) {
     candidates.push(requestedChainId);
   }
-  if (agentPrefersArcTestnet(agentServiceId, accepts)) {
+  if (agentAcceptsArcTestnet(accepts)) {
     candidates.push(ARC_CHAIN_ID);
   }
   if (agentAcceptsBase(accepts)) {
@@ -76,9 +89,6 @@ export function resolveAgentPaymentChain(input: {
   for (const chainId of candidates) {
     if (seen.has(chainId)) continue;
     seen.add(chainId);
-    if (live && chainId === ARC_CHAIN_ID && !ARC_TESTNET_AGENT_IDS.has(agentServiceId)) {
-      continue;
-    }
     if (!accepts?.length) {
       if (chainId === envDefault) return chainId;
       continue;
@@ -90,6 +100,9 @@ export function resolveAgentPaymentChain(input: {
   return envDefault;
 }
 
-export function arcTestnetGatewayReady(agentServiceId: string, accepts?: X402NetworkAccept[]): boolean {
+export function arcTestnetGatewayReady(
+  agentServiceId: string,
+  accepts?: X402NetworkAccept[],
+): boolean {
   return agentPrefersArcTestnet(agentServiceId, accepts) && agentAcceptsArcTestnet(accepts);
 }

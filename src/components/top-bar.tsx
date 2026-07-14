@@ -8,6 +8,7 @@ import { Zap } from "lucide-react";
 export function TopBar() {
   const { activeAgent } = useActiveAgent();
   const { t } = useTranslation();
+  const isArc = activeAgent.network === "arc-testnet";
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border/60 bg-background/70 px-4 backdrop-blur-xl md:px-6">
@@ -16,6 +17,11 @@ export function TopBar() {
           <Zap className="h-3.5 w-3.5 text-primary" />
           <span className="text-muted-foreground">{t("nav.activeAgent")}</span>
           <span className="font-medium text-foreground">{activeAgent.name}</span>
+          {isArc ? (
+            <span className="rounded border border-lime-400/40 bg-lime-400/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-lime-300">
+              Arc
+            </span>
+          ) : null}
           <span className="font-mono text-primary">{activeAgent.price} USDC</span>
         </div>
       </div>

@@ -3,19 +3,23 @@
  * - Circle Gateway batching (AIsa / Discovery sellers)
  * - Standard EIP-3009 exact (Messari and other non-Gateway sellers)
  */
-import { createPublicClient, formatUnits, http, parseAbi } from "viem";
+import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { base } from "viem/chains";
+import { base, polygon } from "viem/chains";
 import { x402Client } from "@x402/core/client";
 import { x402HTTPClient } from "@x402/core/http";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { GatewayClient } from "@circle-fin/x402-batching/client";
 import {
   BASE_USDC_CONTRACT_ADDRESS,
+  POLYGON_USDC_CONTRACT_ADDRESS,
   gatewayChainKeyForChainId,
   type SupportedChainId,
 } from "@/lib/chains";
-import { getGatewayLiquiditySnapshot } from "@/lib/gateway-onchain-balance";
+import {
+  getGatewayLiquiditySnapshot,
+  MAINNET_GATEWAY_WALLET_ADDRESS,
+} from "@/lib/gateway-onchain-balance";
 import { sanitizeRpcUrls } from "@/lib/rpc-urls";
 import { getServerEnv } from "@/server/config/env";
 import { CircleServiceError } from "@/services/circle-errors";
@@ -150,7 +154,7 @@ async function ensureMasterWalletUsdcOnBase(minUsdc: number): Promise<void> {
   if (walletUsdc + 1e-9 < minUsdc) {
     const depositor = masterDepositorAddress();
     throw new CircleServiceError(
-      `Ví master thiếu USDC on-chain trên Base (${walletUsdc.toFixed(6)} < ${minUsdc} USDC) cho x402 exact (Web Search / Messari). ` +
+      `Ví master thiếu USDC on-chain trên Base (${walletUsdc.toFixed(6)} < ${minUsdc} USDC) cho x402 exact (Web Search). ` +
         `Nạp USDC trực tiếp vào ${depositor} trên Base — khác với npm run gateway:deposit.`,
       "INSUFFICIENT_BALANCE",
     );
@@ -276,15 +280,11 @@ function parsePaymentRequiredAcceptsFromHeader(response: Response): PaymentRequi
   }
 }
 
-async function ensureGatewayLiquidity(
+async function readGatewayUsdcBalances(
   gateway: GatewayClient,
   gatewayChain: GatewayChainKey,
-  minUsdc: number,
-): Promise<void> {
+): Promise<{ apiAvailable: number; onChainAvailable: number; effectiveAvailable: number }> {
   const depositor = masterDepositorAddress();
-
-  // Circle Gateway available balance via HTTP API (no RPC dependency — survives
-  // broken POLYGON_RPC_URL such as wss:// endpoints).
   const gatewayBalance = await (
     gateway as unknown as {
       getBalance: (address?: string) => Promise<{ formattedAvailable: string }>;
@@ -292,7 +292,6 @@ async function ensureGatewayLiquidity(
   ).getBalance(depositor);
   const apiAvailable = Number.parseFloat(gatewayBalance.formattedAvailable) || 0;
 
-  // On-chain read is best-effort (extra safety when API lags); never blocks pay.
   let onChainAvailable = 0;
   try {
     const rpcUrls =
@@ -309,19 +308,128 @@ async function ensureGatewayLiquidity(
     console.warn("[gateway] on-chain liquidity read skipped:", error);
   }
 
-  const effectiveAvailable = Math.max(apiAvailable, onChainAvailable);
+  return {
+    apiAvailable,
+    onChainAvailable,
+    effectiveAvailable: Math.max(apiAvailable, onChainAvailable),
+  };
+}
 
-  if (effectiveAvailable < minUsdc) {
+/**
+ * Move idle USDC from master EOA → Circle Gateway when Gateway available < need.
+ * Prevents "user has Content Credits but Surf fails" when EOA still holds Polygon USDC.
+ */
+async function autoDepositWalletUsdcIntoGateway(
+  gateway: GatewayClient,
+  gatewayChain: GatewayChainKey,
+  shortfallUsdc: number,
+): Promise<number> {
+  if (gatewayChain === "arcTestnet") return 0;
+
+  const privateKey = getServerEnv().MASTER_AGENT_PRIVATE_KEY as `0x${string}`;
+  const account = privateKeyToAccount(privateKey);
+  const isPolygon = gatewayChain === "polygon";
+  const chain = isPolygon ? polygon : base;
+  const usdc = isPolygon ? POLYGON_USDC_CONTRACT_ADDRESS : BASE_USDC_CONTRACT_ADDRESS;
+  const rpcUrl = rpcUrlForGatewayChain(gatewayChain);
+  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+
+  const walletRaw = await publicClient.readContract({
+    address: usdc,
+    abi: erc20BalanceAbi,
+    functionName: "balanceOf",
+    args: [account.address],
+  });
+  const walletUsdc = Number.parseFloat(formatUnits(walletRaw, 6));
+  if (walletUsdc + 1e-9 < shortfallUsdc) {
+    return 0;
+  }
+
+  // Leave a tiny dust buffer; deposit at least the shortfall, prefer all usable wallet funds.
+  const depositUsdc = Math.min(walletUsdc, Math.max(shortfallUsdc, Math.min(walletUsdc, 0.05)));
+  const amountStr = depositUsdc.toFixed(6).replace(/\.?0+$/, "") || "0";
+  if (Number.parseFloat(amountStr) <= 0) return 0;
+
+  console.info(
+    `[gateway] Auto-deposit ${amountStr} USDC from EOA → Gateway (${gatewayChain}) for Surf liquidity`,
+  );
+
+  if (isPolygon) {
+    const walletClient = createWalletClient({ account, chain: polygon, transport: http(rpcUrl) });
+    const depositAmount = parseUnits(amountStr, 6);
+    const erc20Abi = parseAbi([
+      "function allowance(address owner, address spender) view returns (uint256)",
+      "function approve(address spender, uint256 value) returns (bool)",
+    ]);
+    const gatewayAbi = parseAbi([
+      "function deposit(address token, uint256 amount)",
+    ]);
+
+    const allowance = await publicClient.readContract({
+      address: usdc,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [account.address, MAINNET_GATEWAY_WALLET_ADDRESS],
+    });
+    if (allowance < depositAmount) {
+      const approveHash = await walletClient.writeContract({
+        address: usdc,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [MAINNET_GATEWAY_WALLET_ADDRESS, depositAmount],
+      });
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    }
+    const depositHash = await walletClient.writeContract({
+      address: MAINNET_GATEWAY_WALLET_ADDRESS,
+      abi: gatewayAbi,
+      functionName: "deposit",
+      args: [usdc, depositAmount],
+      gas: 350000n,
+    });
+    await publicClient.waitForTransactionReceipt({ hash: depositHash });
+    return depositUsdc;
+  }
+
+  await gateway.deposit(amountStr);
+  return depositUsdc;
+}
+
+async function ensureGatewayLiquidity(
+  gateway: GatewayClient,
+  gatewayChain: GatewayChainKey,
+  minUsdc: number,
+): Promise<void> {
+  const depositor = masterDepositorAddress();
+  let balances = await readGatewayUsdcBalances(gateway, gatewayChain);
+
+  if (balances.effectiveAvailable < minUsdc) {
+    const shortfall = minUsdc - balances.effectiveAvailable + 0.001;
+    try {
+      const deposited = await autoDepositWalletUsdcIntoGateway(
+        gateway,
+        gatewayChain,
+        shortfall,
+      );
+      if (deposited > 0) {
+        balances = await readGatewayUsdcBalances(gateway, gatewayChain);
+      }
+    } catch (error) {
+      console.warn("[gateway] Auto-deposit failed:", error);
+    }
+  }
+
+  if (balances.effectiveAvailable < minUsdc) {
     throw new CircleServiceError(
-      `Circle Gateway thiếu USDC (${gatewayChain}): API ${apiAvailable.toFixed(6)}, on-chain ${onChainAvailable.toFixed(6)}, cần ~${minUsdc} (${depositor}). ` +
-        `Surf cần Gateway trên Polygon — nạp USDC + MATIC gas cho master, hoặc npm run gateway:deposit trên đúng chain.`,
+      `Circle Gateway thiếu USDC (${gatewayChain}): API ${balances.apiAvailable.toFixed(6)}, on-chain ${balances.onChainAvailable.toFixed(6)}, cần ~${minUsdc} (${depositor}). ` +
+        `Surf cần Gateway trên Polygon — nạp USDC + MATIC gas cho master, hoặc npm run gateway:deposit -- 0.05 polygon.`,
       "INSUFFICIENT_BALANCE",
     );
   }
 
-  if (apiAvailable < minUsdc && onChainAvailable >= minUsdc) {
+  if (balances.apiAvailable < minUsdc && balances.onChainAvailable >= minUsdc) {
     console.info(
-      `[gateway] API balance lag (${apiAvailable} USDC); paying from on-chain ${onChainAvailable} USDC`,
+      `[gateway] API balance lag (${balances.apiAvailable} USDC); paying from on-chain ${balances.onChainAvailable} USDC`,
     );
   }
 }

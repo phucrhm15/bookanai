@@ -1,5 +1,6 @@
 import type { Locale } from "@/lib/i18n/types";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
+import { buildUniswapArcSwapUrl } from "@/lib/arc-testnet-ecosystem";
 
 const MASTER_GATEWAY_USDC_RE =
   /Circle Gateway thiếu USDC|Gateway thiếu USDC/i;
@@ -53,7 +54,7 @@ export function formatPaymentErrorForUser(
     const addr = extractAddress(message);
     if (locale === "vi") {
       return (
-        "Web Search / Messari trả API bằng x402 exact trên Base — ví master server cần USDC **on-chain** (~0.007–0.1 USDC/lần), " +
+        "Web Search trả API bằng x402 exact trên Base — ví master server cần USDC **on-chain** (~0.007 USDC/lần), " +
         "không phải Content Credits của bạn và **không** dùng npm run gateway:deposit. " +
         (addr
           ? `Admin: chuyển ≥0.02 USDC (mạng Base) vào ${addr} · npm run show:x402`
@@ -61,7 +62,7 @@ export function formatPaymentErrorForUser(
       );
     }
     return (
-      "Web Search / Messari pay via exact x402 on Base — the server master wallet needs **on-chain** USDC (~0.007–0.1/call), " +
+      "Web Search pay via exact x402 on Base — the server master wallet needs **on-chain** USDC (~0.007/call), " +
       "not your Content Credits and **not** npm run gateway:deposit. " +
       (addr
         ? `Admin: send ≥0.02 USDC on Base to ${addr} · npm run show:x402`
@@ -222,6 +223,11 @@ export function formatPaymentErrorForUser(
       : 0;
     const availMatch = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
     const available = availMatch ? Number(availMatch[1] ?? availMatch[2]) : 0;
+    const swapUrl = buildUniswapArcSwapUrl({
+      tokenIn: "EURC",
+      tokenOut: "USDC",
+      amount: required > 0 ? required.toFixed(4) : undefined,
+    });
 
     if (locale === "vi") {
       let hint =
@@ -237,7 +243,7 @@ export function formatPaymentErrorForUser(
           `~${hold.toFixed(3)} USDC đang chờ settle sau các lần chạy agent trước (ví on-chain ${onChain.toFixed(3)} USDC, credits khả dụng ${available.toFixed(3)}). ` +
           `Nạp thêm ~${topUp.toFixed(2)} USDC (Base) hoặc chọn agent rẻ hơn (Surf ~0.001 USDC). Mở Wallet để xử lý settle.`;
       }
-      return `Số dư Content Credits không đủ cho lần gọi này. ${hint}`;
+      return `Số dư Content Credits không đủ cho lần gọi này. ${hint} Nếu bạn đang giữ token khác, có thể swap sang USDC trên Uniswap (Arc): ${swapUrl}`;
     }
 
     let hint = "Open Wallet & Billing → Top Up (USDC on Base). You do not need ETH in your wallet.";
@@ -252,7 +258,7 @@ export function formatPaymentErrorForUser(
         `~${hold.toFixed(3)} USDC is settling from earlier agent runs (on-chain ${onChain.toFixed(3)} USDC, spendable credits ${available.toFixed(3)}). ` +
         `Top up ~${topUp.toFixed(2)} USDC on Base or pick a cheaper agent (Surf ~0.001 USDC). Open Wallet to process settlement.`;
     }
-    return `Insufficient Content Credits for this call. ${hint}`;
+    return `Insufficient Content Credits for this call. ${hint} If you hold another token, swap to USDC on Uniswap (Arc): ${swapUrl}`;
   }
 
   if (message.includes("Gateway batching") || message.includes("No Gateway batching")) {

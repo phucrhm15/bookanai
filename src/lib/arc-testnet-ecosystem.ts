@@ -71,6 +71,13 @@ export const ARC_ECOSYSTEM_TOOLS: ArcEcosystemTool[] = [
     category: "defi",
   },
   {
+    id: "uniswap",
+    nameKey: "toolUniswap",
+    descKey: "toolUniswapDesc",
+    url: "https://app.uniswap.org/swap",
+    category: "swap",
+  },
+  {
     id: "contracts",
     nameKey: "toolContracts",
     descKey: "toolContractsDesc",
@@ -100,6 +107,36 @@ export const ARC_NETWORK_FACTS = {
   hardforkVersion: "v0.7.2",
   hardforkActivationUtc: "2026-06-18T12:00:00Z",
 } as const;
+
+const ARC_TOKEN_TO_UNISWAP_ADDRESS: Record<string, string> = {
+  USDC: ARC_USDC_CONTRACT_ADDRESS,
+  EURC: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",
+};
+
+/**
+ * Build a prefilled Uniswap URL for Arc.
+ * Falls back to symbol text when a token address is unknown.
+ */
+export function buildUniswapArcSwapUrl(input: {
+  tokenIn?: string;
+  tokenOut?: string;
+  amount?: string;
+}): string {
+  const params = new URLSearchParams();
+  params.set("chain", "arc");
+
+  const inToken = (input.tokenIn ?? "").toUpperCase();
+  const outToken = (input.tokenOut ?? "").toUpperCase();
+  const inValue = ARC_TOKEN_TO_UNISWAP_ADDRESS[inToken] ?? inToken;
+  const outValue = ARC_TOKEN_TO_UNISWAP_ADDRESS[outToken] ?? outToken;
+
+  if (inValue) params.set("inputCurrency", inValue);
+  if (outValue) params.set("outputCurrency", outValue);
+  if (input.amount && Number(input.amount) > 0) params.set("exactField", "input");
+  if (input.amount && Number(input.amount) > 0) params.set("exactAmount", input.amount);
+
+  return `https://app.uniswap.org/swap?${params.toString()}`;
+}
 
 export function arcExplorerAddressUrl(address: string): string {
   return `${ARC_NETWORK_FACTS.explorerUrl}/address/${address}`;

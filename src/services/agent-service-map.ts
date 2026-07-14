@@ -17,34 +17,31 @@ type DiscoveryResponse = {
 };
 
 /**
- * Studio agent id → Circle x402 Discovery resource URL (or Messari direct x402 URL).
+ * Studio agent id → Circle x402 Discovery resource URL.
  * Each URL must be payable via x402 (HTTP 402 + USDC) at resolve time.
  */
 export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
-  /** Messari x402 — /details returns 403 after pay; /ath works with exact EIP-3009 */
-  "messari-analyst": "https://api.messari.io/metrics/v2/assets/ath",
   /** Exa web search — AIsa Perplexity removed from Circle Discovery (2026) */
   "perplexity-social": "https://api.exa.ai/search",
   "surf-news": "https://nano.blockrun.ai/api/v1/surf/news/feed",
-  "surf-tokenomics": "https://nano.blockrun.ai/api/v1/surf/token/tokenomics",
   /** Orchestrated multi-API workflow — probe uses Exa entry point */
   "crypto-research-b": "https://api.exa.ai/search",
+  /** Arc Testnet agents — Circle Discovery AIsa resources (pay Base today; settle Arc on TEST keys) */
+  "arc-market-pulse": "https://api.aisa.one/apis/v2/coingecko/search/trending",
+  "arc-sonar-brief": "https://api.aisa.one/apis/v2/perplexity/sonar",
 };
 
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
 export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> = {
   "perplexity-social": 0.007,
   "surf-news": 0.001,
-  "surf-tokenomics": 0.0019,
-  "messari-analyst": 0.1,
-  "crypto-research-b": 0.218,
+  "crypto-research-b": 0.11,
+  "arc-market-pulse": 0.008,
+  "arc-sonar-brief": 0.008,
 };
 
 /** Surf pays via Circle GatewayWalletBatched on Polygon — not Base exact x402. */
-export const GATEWAY_POLYGON_AGENT_IDS = new Set([
-  "surf-news",
-  "surf-tokenomics",
-]);
+export const GATEWAY_POLYGON_AGENT_IDS = new Set(["surf-news"]);
 
 /** Re-export Arc Testnet agent gateway — register agent ids when they ship on Arc x402. */
 export {
@@ -61,9 +58,9 @@ export function agentUsesGatewayPolygonPay(agentServiceId: string): boolean {
 
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
 const DIRECT_X402_HOSTS = new Set([
-  "api.messari.io",
   "nano.blockrun.ai",
   "api.exa.ai",
+  "api.aisa.one",
   "api.vaults.fyi",
   "api.itsgloria.ai",
 ]);
@@ -221,7 +218,7 @@ export async function getDiscoveryCatalogItem(
 
 /**
  * Resolve a paid x402 resource URL for a Studio agent id.
- * Circle Discovery exact match first; Messari uses direct x402 catalog when absent.
+ * Circle Discovery exact match first; host allowlist for direct x402 sellers.
  */
 export async function resolveAgentResource(
   agentId: string,

@@ -18,7 +18,7 @@ export const en = {
     heroTitleAccent: "X threads",
     heroTitleSuffix: ", paid in USDC",
     heroBody:
-      "Sign up, fund your embedded wallet (Base), pick Messari or Perplexity, get content formatted for X — no separate API keys.",
+      "Sign up, fund your embedded wallet (Base), pick Surf or Web Search, get content formatted for X — no separate API keys.",
     ctaSignUp: "Create account",
     ctaSignIn: "Sign in",
     ctaHasAccount: "Already have an account",
@@ -45,7 +45,7 @@ export const en = {
     title: "x402",
     titleAccent: "Data Agents",
     subtitle:
-      "Real APIs on Circle x402 Marketplace — Messari on-chain metrics and Perplexity search — pay USDC per request.",
+      "Real APIs on Circle x402 — Base mainnet agents + Arc Testnet settlement path (USDC gas).",
     searchPlaceholder: "Search agents…",
     agentsCount: "{{count}} of {{total}} agents",
     usdcPerRequest: "USDC / request",
@@ -55,13 +55,12 @@ export const en = {
     noResults: 'No agents match "{{query}}". Try another keyword.',
     toastActive: "{{name}} is now active",
     toastActiveDesc: "{{price}} USDC per request",
+    sectionBase: "Base · mainnet x402",
+    sectionArc: "Arc Testnet · USDC gas",
+    badgeArc: "Arc Testnet",
+    badgeBase: "Base",
   },
   agents: {
-    messari: {
-      description:
-        "Token price / ATH / volume (BTC, ETH…). ~0.1 USDC/call — not long-form macro news.",
-      category: "On-chain Data",
-    },
     perplexity: {
       description: "Macro & political news, long X threads (~0.01 USDC/call). Prompt in English or Vietnamese.",
       category: "Search & News",
@@ -71,15 +70,20 @@ export const en = {
         "AI-curated crypto headlines and social intelligence from Surf (~0.001 USDC/call).",
       category: "News Feed",
     },
-    surfTokenomics: {
-      description:
-        "Tokenomics snapshots from Surf (~0.0019 USDC/call): supply, unlocks, and token structure.",
-      category: "Token Research",
-    },
     stackB: {
       description:
-        "One-click alt research (~0.22 USDC): Exa + Messari details + vaults.fyi + Gloria ticker news ×3.",
+        "One-click alt research (~0.11 USDC): Exa + vaults.fyi + Gloria ticker news ×3.",
       category: "Research Stack",
+    },
+    arcMarketPulse: {
+      description:
+        "Trending crypto categories via x402 — Arc Testnet settlement path (USDC gas). ~0.008 USDC/run.",
+      category: "Arc Testnet",
+    },
+    arcSonarBrief: {
+      description:
+        "Perplexity Sonar research brief via x402 — Arc / USDC-native gas prompts. Arc Testnet settlement path.",
+      category: "Arc Testnet",
     },
   },
   studio: {
@@ -96,19 +100,23 @@ export const en = {
     runFetching: "Fetching API data…",
     runIdle: "Run Agent · pay via x402",
     footerLine: "x402 · dynamic USDC · one charge per Run · {{network}}",
-    defaultPromptMessari: "Analyze BTC and ETH: price, 24h volume, market cap from Messari.",
     defaultPromptPerplexity:
       "Summarize the latest global macro and political news affecting crypto markets.",
     defaultPromptSurf: "Give me the top crypto headlines today and why they matter.",
-    defaultPromptSurfTokenomics:
-      "Analyze tokenomics for BTC, ETH, and SOL: supply structure, unlock pressure, and key risks.",
     defaultPromptStackB:
       "Mid-cap altcoin scan: L1/L2/DeFi narratives, TVL rotation, unlocks (STRICT — no BTC, ETH, BNB, XRP, stables).",
+    defaultPromptArcSonar:
+      "Explain Arc Testnet: USDC as native gas, nanopayments for AI agents, and why Circle built an L1 for stablecoins.",
     promptLabel: "Your prompt",
     agentNoteSurfNews:
       "Surf Crypto News returns an **AI-curated crypto headline feed** (~0.001 USDC/run). No prompt needed — click Run Agent for the latest headlines from Surf (nano.blockrun.ai). For custom search queries, use **Web Search Writer**.",
+    agentNoteArcPulse:
+      "Arc Market Pulse pulls **trending CoinGecko categories** via Circle x402 (~0.008 USDC). No prompt needed. With a TEST Circle key, settlement uses Arc Testnet (USDC gas). LIVE keys settle on Base.",
     promptEmpty: "Add a prompt first",
     promptMismatchTitle: "This agent may not match your prompt",
+    swapThenRetry: "Swap to USDC, then retry",
+    retryRun: "Retry run",
+    walletRefreshedAfterSwap: "Wallet balance refreshed after swap",
     paymentFailed: "Payment failed",
     paymentNoData: "Payment succeeded but API returned no data",
     charged: "Charged {{amount}} USDC",
@@ -265,10 +273,15 @@ export const en = {
     toolDeployDesc: "Quickstart — connect wallet, deploy contracts, test USDC flows.",
     toolAppKit: "Circle App Kit",
     toolAppKitDesc: "Unified send, swap, and bridge SDK for USDC apps.",
+    toolUniswap: "Uniswap",
+    toolUniswapDesc: "Swap and liquidity UI on Arc Mainnet for in-app USDC conversion flows.",
     toolContracts: "Smart Contract Platform",
     toolContractsDesc: "Deploy ERC-20/721 templates via Circle APIs.",
     toolEurc: "EURC on Arc",
     toolEurcDesc: "Euro stablecoin testnet contract for FX and swap experiments.",
+    openUniswap: "Open Uniswap",
+    uniswapCtaHint:
+      "Use Uniswap for Arc Mainnet swap UX while App Kit swap on this environment is disabled.",
   },
   ledger: {
     depositSync: "USDC deposit · synced from on-chain wallet",
@@ -295,40 +308,26 @@ export const en = {
     copy: "Copy",
     copied: "Copied",
     copyFailed: "Could not copy to clipboard",
-    messariEmpty: "📊 [MARKET UPDATE]\nNo token data in Messari response.",
-    messariHeader: "📊 [MARKET UPDATE]",
-    messariHint:
-      "ATH / price data from Messari (metrics API). For long macro news → use Perplexity Search Writer.",
-    messariPrice: "Current price: {{price}}",
-    messariVol: "24h vol: {{vol}}",
-    messariMcap: "Market cap: {{mcap}}",
-    messariAthDown: "{{pct}}% below ATH",
     perplexityHeader: "🌍 [MACRO NEWS]",
     perplexityEmpty: "🌍 [MACRO NEWS]\nNo search content returned.",
     surfHeader: "🏄 [SURF CRYPTO FEED]",
     surfEmpty: "🏄 [SURF CRYPTO FEED]\nNo curated feed content returned.",
-    surfTokenomicsHeader: "🧬 [SURF TOKENOMICS]",
-    surfTokenomicsEmpty: "🧬 [SURF TOKENOMICS]\nNo tokenomics data returned.",
     responseEmpty: "Empty response.",
   },
   hints: {
-    messariMismatch:
-      "This prompt looks like macro news — use **Web Search Writer** (~0.007 USDC). Messari only returns token ATH/price (~0.1 USDC), not long articles.",
     perplexityMismatch:
-      "This prompt looks like market data — try **Messari Token Analyst** for on-chain ATH/price.",
+      "This prompt looks like market-data analysis — try **Crypto Research Stack B** (~0.11 USDC) or shorten to a search query for Web Search Writer.",
     surfNewsNoPrompt:
       "Surf Crypto News returns a **fixed news feed** from the API — your prompt **does not change** the result. For Q&A, use **Web Search Writer**.",
-    surfTokenomicsPartial:
-      "Surf Tokenomics only reads a **token symbol** from your prompt (API ?symbol=). Will query **{{symbol}}** — not full natural-language analysis.",
-    messariPartial:
-      "Messari only fetches **BTC / ETH / SOL** metrics (ATH, price, volume) from keywords — not a full answer to your question.",
     stackBFull:
-      "Stack B: **alt-only** (~0.22 USDC) — Exa narratives → Messari fundamentals → vaults.fyi yields → Gloria news ×3. **Loại cứng** BTC, ETH, BNB, XRP & stablecoin ở mọi bước.",
+      "Stack B: **alt-only** (~0.11 USDC) — Exa narratives → vaults.fyi yields → Gloria news ×3. Hard-excludes BTC, ETH, BNB, XRP & stables.",
+    arcSonarFull:
+      "Arc Sonar Brief sends your prompt to Perplexity Sonar via x402. Prefer questions about Arc, USDC gas, or Circle stablecoin rails.",
   },
   meta: {
     homeTitle: "Nano.Agent — x402 AI agents paid with USDC",
     homeDescription:
-      "Call Messari & Perplexity via x402, format X threads. Fund Base USDC — no API keys required.",
+      "Call Surf & Exa via x402, format X threads. Fund Base USDC — no API keys required.",
     marketplaceTitle: "Marketplace · Nano.Agent",
     marketplaceDescription: "Browse autonomous AI agents — pay per call with USDC via x402.",
   },

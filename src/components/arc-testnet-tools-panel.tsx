@@ -32,6 +32,7 @@ import {
   ARC_FAUCET_URL,
   ARC_NETWORK_FACTS,
   ARC_WALLET_CHAIN_PARAMS,
+  buildUniswapArcSwapUrl,
   arcExplorerAddressUrl,
 } from "@/lib/arc-testnet-ecosystem";
 import { UB_CHAIN_ARC } from "@/lib/chains";
@@ -54,7 +55,7 @@ export function ArcTestnetToolsPanel({ walletAddress }: ArcTestnetToolsPanelProp
   const [busy, setBusy] = useState(false);
 
   const [bridgeAmount, setBridgeAmount] = useState("5");
-  const [bridgeFrom, setBridgeFrom] = useState(UB_CHAIN_ARC);
+  const [bridgeFrom, setBridgeFrom] = useState<string>(UB_CHAIN_ARC);
   const [bridgeTo, setBridgeTo] = useState("");
 
   const [depositAmount, setDepositAmount] = useState("1");
@@ -147,6 +148,11 @@ export function ArcTestnetToolsPanel({ walletAddress }: ArcTestnetToolsPanelProp
 
   const swapEnabled = metaQuery.data?.swapEnabled ?? false;
   const usdcOnArc = fundingQuery.data?.usdcOnArc ?? 0;
+  const uniswapSwapUrl = buildUniswapArcSwapUrl({
+    tokenIn,
+    tokenOut,
+    amount: swapAmount,
+  });
 
   return (
     <section className="mt-6 rounded-xl border border-lime-500/30 bg-gradient-panel p-5 shadow-[0_0_24px_-8px_rgba(132,204,22,0.25)]">
@@ -338,7 +344,19 @@ export function ArcTestnetToolsPanel({ walletAddress }: ArcTestnetToolsPanelProp
 
         <TabsContent value="swap" className="mt-4 space-y-3">
           {!swapEnabled ? (
-            <p className="text-xs text-muted-foreground">{t("appKit.swapNeedsKitKey")}</p>
+            <>
+              <p className="text-xs text-muted-foreground">{t("appKit.swapNeedsKitKey")}</p>
+              <div className="rounded-md border border-border/50 bg-background/40 p-3">
+                <p className="mb-2 text-xs text-muted-foreground">{t("arcTools.uniswapCtaHint")}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(uniswapSwapUrl, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" /> {t("arcTools.openUniswap")}
+                </Button>
+              </div>
+            </>
           ) : (
             <>
               <p className="text-xs text-muted-foreground">{t("arcTools.swapHelp")}</p>
@@ -395,6 +413,12 @@ export function ArcTestnetToolsPanel({ walletAddress }: ArcTestnetToolsPanelProp
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {t("arcTools.runSwap")}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.open(uniswapSwapUrl, "_blank", "noopener,noreferrer")}
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> {t("arcTools.openUniswap")}
               </Button>
             </>
           )}

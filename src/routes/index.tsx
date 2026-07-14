@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Call Messari & Perplexity via x402, format X threads. Fund Base USDC — no API keys required.",
+          "Call Surf & Exa via x402, format X threads. Fund Base USDC — no API keys required.",
       },
     ],
   }),

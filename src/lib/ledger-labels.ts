@@ -77,8 +77,17 @@ function fromLegacyPatterns(label: string, locale: Locale): string | undefined {
   if (/Messari Token Analyst · Nanopayment/i.test(label)) {
     return translateKey(locale, "x402", { agent: "Messari Token Analyst" });
   }
-  if (/Perplexity Search Writer · Nanopayment/i.test(label)) {
-    return translateKey(locale, "x402", { agent: "Perplexity Search Writer" });
+  if (/Surf Crypto News · Nanopayment/i.test(label)) {
+    return translateKey(locale, "x402", { agent: "Surf Crypto News" });
+  }
+  if (/Arc Market Pulse · Nanopayment/i.test(label)) {
+    return translateKey(locale, "x402", { agent: "Arc Market Pulse" });
+  }
+  if (/Arc Sonar Brief · Nanopayment/i.test(label)) {
+    return translateKey(locale, "x402", { agent: "Arc Sonar Brief" });
+  }
+  if (/Perplexity Search Writer · Nanopayment|Web Search Writer · Nanopayment/i.test(label)) {
+    return translateKey(locale, "x402", { agent: "Web Search Writer" });
   }
 
   return undefined;

@@ -33,10 +33,9 @@ export type AgentStudioInput = {
 };
 
 const DEFAULT_PROMPT_KEYS: Partial<Record<string, string>> = {
-  "messari-analyst": "studio.defaultPromptMessari",
   "perplexity-social": "studio.defaultPromptPerplexity",
-  "surf-tokenomics": "studio.defaultPromptSurfTokenomics",
   "crypto-research-b": "studio.defaultPromptStackB",
+  "arc-sonar-brief": "studio.defaultPromptArcSonar",
 };
 
 /** Pre-filled Studio prompt (user can edit or replace). */
@@ -50,6 +49,7 @@ export function defaultPromptForAgent(
 
 const AGENT_NOTE_KEYS: Partial<Record<string, string>> = {
   "surf-news": "studio.agentNoteSurfNews",
+  "arc-market-pulse": "studio.agentNoteArcPulse",
 };
 
 export function getAgentStudioInput(
@@ -80,23 +80,8 @@ export function agentPromptBehavior(
   prompt: string,
   locale: Locale = DEFAULT_LOCALE,
 ): AgentPromptBehavior {
-  if (agentId === "surf-news") {
+  if (agentId === "surf-news" || agentId === "arc-market-pulse") {
     return { mode: "none" };
-  }
-
-  if (agentId === "surf-tokenomics") {
-    const symbol = inferSymbolHint(prompt);
-    return {
-      mode: "partial",
-      info: translate(locale, "hints.surfTokenomicsPartial", { symbol }),
-    };
-  }
-
-  if (agentId === "messari-analyst") {
-    return {
-      mode: "partial",
-      info: translate(locale, "hints.messariPartial"),
-    };
   }
 
   if (agentId === "perplexity-social") {
@@ -110,24 +95,14 @@ export function agentPromptBehavior(
     };
   }
 
-  return { mode: "full" };
-}
-
-/** Rough symbol for Surf tokenomics hint (mirrors server inferSurfSymbol). */
-function inferSymbolHint(prompt: string): string {
-  const text = prompt.toUpperCase();
-  const fromDollar = text.match(/\$([A-Z0-9]{2,12})\b/);
-  if (fromDollar?.[1]) return fromDollar[1];
-  const candidates = text.match(/\b[A-Z]{2,12}\b/g) ?? [];
-  for (const token of candidates) {
-    if (!["API", "JSON", "HTTP", "USDC", "BASE", "X", "THREAD", "BTC", "ETH", "SOL"].includes(token)) {
-      return token;
-    }
+  if (agentId === "arc-sonar-brief") {
+    return {
+      mode: "full",
+      info: translate(locale, "hints.arcSonarFull"),
+    };
   }
-  if (/\bBTC\b|\bBITCOIN\b/i.test(prompt)) return "BTC";
-  if (/\bETH\b|\bETHEREUM\b/i.test(prompt)) return "ETH";
-  if (/\bSOL\b|\bSOLANA\b/i.test(prompt)) return "SOL";
-  return "AAVE";
+
+  return { mode: "full" };
 }
 
 export function agentPromptMismatch(
@@ -137,13 +112,6 @@ export function agentPromptMismatch(
 ): { warn: boolean; message?: string } {
   const trimmed = prompt.trim();
   if (!trimmed) return { warn: false };
-
-  if (agentId === "messari-analyst" && isMacroNewsPrompt(trimmed) && !isMarketDataPrompt(trimmed)) {
-    return {
-      warn: true,
-      message: translate(locale, "hints.messariMismatch"),
-    };
-  }
 
   if (agentId === "perplexity-social" && isMarketDataPrompt(trimmed) && !isMacroNewsPrompt(trimmed)) {
     return {

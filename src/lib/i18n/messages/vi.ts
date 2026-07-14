@@ -20,7 +20,7 @@ export const vi: typeof en = {
     heroTitleAccent: "thread X",
     heroTitleSuffix: ", trả bằng USDC",
     heroBody:
-      "Đăng ký, nạp USDC vào ví embedded (Base), chọn Messari hoặc Perplexity, nhận nội dung định dạng sẵn cho X — không cần API key riêng.",
+      "Đăng ký, nạp USDC vào ví embedded (Base), chọn Surf hoặc Web Search, nhận nội dung định dạng sẵn cho X — không cần API key riêng.",
     ctaSignUp: "Tạo tài khoản",
     ctaSignIn: "Đăng nhập",
     ctaHasAccount: "Đã có tài khoản",
@@ -47,7 +47,7 @@ export const vi: typeof en = {
     title: "x402",
     titleAccent: "Data Agents",
     subtitle:
-      "Hai API thật trên Circle x402 Marketplace — Messari on-chain và Perplexity search — trả USDC theo request.",
+      "API x402 thật — agent Base mainnet + nhóm Arc Testnet (gas bằng USDC).",
     searchPlaceholder: "Tìm agent…",
     agentsCount: "{{count}} / {{total}} agents",
     usdcPerRequest: "USDC / lần",
@@ -57,13 +57,12 @@ export const vi: typeof en = {
     noResults: 'Không có agent khớp "{{query}}". Thử từ khóa khác.',
     toastActive: "{{name}} đã được chọn",
     toastActiveDesc: "{{price}} USDC mỗi lần gọi",
+    sectionBase: "Base · mainnet x402",
+    sectionArc: "Arc Testnet · gas USDC",
+    badgeArc: "Arc Testnet",
+    badgeBase: "Base",
   },
   agents: {
-    messari: {
-      description:
-        "Giá / ATH / volume token (BTC, ETH…). ~0.1 USDC/lần — không phải tin vĩ mô dài.",
-      category: "Dữ liệu on-chain",
-    },
     perplexity: {
       description:
         "Tin vĩ mô, chính trị, thread X dài (~0.01 USDC/lần). Prompt tiếng Việt hoặc Anh.",
@@ -74,15 +73,20 @@ export const vi: typeof en = {
         "Tin crypto tuyển chọn bằng AI và social intelligence từ Surf (~0.001 USDC/lần).",
       category: "Bản tin nhanh",
     },
-    surfTokenomics: {
-      description:
-        "Phân tích tokenomics từ Surf (~0.0019 USDC/lần): cung, unlock và cấu trúc token.",
-      category: "Nghiên cứu token",
-    },
     stackB: {
       description:
-        "Nghiên cứu alt một lần bấm (~0.22 USDC): Exa + Messari details + vaults.fyi + Gloria ticker ×3.",
+        "Nghiên cứu alt một lần bấm (~0.11 USDC): Exa + vaults.fyi + Gloria ticker ×3.",
       category: "Research Stack",
+    },
+    arcMarketPulse: {
+      description:
+        "Danh mục trending CoinGecko qua x402 — settle Arc Testnet (gas USDC). ~0.008 USDC/lần.",
+      category: "Arc Testnet",
+    },
+    arcSonarBrief: {
+      description:
+        "Brief nghiên cứu Perplexity Sonar qua x402 — prompt về Arc / gas USDC. Settle Arc Testnet.",
+      category: "Arc Testnet",
     },
   },
   studio: {
@@ -99,19 +103,23 @@ export const vi: typeof en = {
     runFetching: "Đang lấy dữ liệu API…",
     runIdle: "Chạy Agent · trả qua x402",
     footerLine: "x402 · giá động USDC · chỉ trừ 1 lần/Run · {{network}}",
-    defaultPromptMessari: "Phân tích BTC và ETH: giá, volume 24h, market cap từ Messari.",
     defaultPromptPerplexity:
       "Tóm tắt tin vĩ mô và chính trị toàn cầu mới nhất ảnh hưởng đến thị trường crypto.",
     defaultPromptSurf: "Cho tôi các headline crypto nổi bật hôm nay và vì sao quan trọng.",
-    defaultPromptSurfTokenomics:
-      "Phân tích tokenomics BTC, ETH, SOL: cấu trúc nguồn cung, áp lực unlock và rủi ro chính.",
     defaultPromptStackB:
       "Quét alt mid-cap: narrative L1/L2/DeFi, TVL, unlock (LOẠI BTC, ETH, BNB, XRP, stablecoin).",
+    defaultPromptArcSonar:
+      "Giải thích Arc Testnet: USDC làm gas native, nanopayment cho AI agents, và vì sao Circle xây L1 cho stablecoin.",
     promptLabel: "Prompt của bạn",
     agentNoteSurfNews:
       "Surf Crypto News trả **feed tin crypto được AI chọn lọc** (~0.001 USDC/lần). Không cần nhập prompt — bấm Chạy Agent để lấy headline mới nhất từ Surf (nano.blockrun.ai). Muốn tìm kiếm theo câu hỏi? Chọn **Web Search Writer**.",
+    agentNoteArcPulse:
+      "Arc Market Pulse lấy **danh mục trending CoinGecko** qua Circle x402 (~0.008 USDC). Không cần prompt. KEY TEST → settle trên Arc Testnet (gas USDC). KEY LIVE → settle trên Base.",
     promptEmpty: "Nhập prompt trước",
     promptMismatchTitle: "Agent có thể không phù hợp prompt",
+    swapThenRetry: "Swap sang USDC rồi chạy lại",
+    retryRun: "Chạy lại",
+    walletRefreshedAfterSwap: "Đã cập nhật lại số dư ví sau khi swap",
     paymentFailed: "Thanh toán thất bại",
     paymentNoData: "Thanh toán thành công nhưng API không trả dữ liệu",
     charged: "Đã trừ {{amount}} USDC",
@@ -269,10 +277,15 @@ export const vi: typeof en = {
     toolDeployDesc: "Quickstart — kết nối ví, deploy contract, test luồng USDC.",
     toolAppKit: "Circle App Kit",
     toolAppKitDesc: "SDK send, swap, bridge thống nhất cho app USDC.",
+    toolUniswap: "Uniswap",
+    toolUniswapDesc: "Giao diện swap và liquidity trên Arc Mainnet cho luồng đổi USDC trong app.",
     toolContracts: "Smart Contract Platform",
     toolContractsDesc: "Deploy template ERC-20/721 qua Circle API.",
     toolEurc: "EURC trên Arc",
     toolEurcDesc: "Contract stablecoin Euro testnet cho thử nghiệm FX và swap.",
+    openUniswap: "Mở Uniswap",
+    uniswapCtaHint:
+      "Dùng Uniswap cho trải nghiệm swap trên Arc Mainnet khi môi trường này chưa bật App Kit swap.",
   },
   ledger: {
     depositSync: "Nạp USDC · đồng bộ từ ví on-chain",
@@ -299,40 +312,26 @@ export const vi: typeof en = {
     copy: "Copy",
     copied: "Đã copy!",
     copyFailed: "Không thể copy vào clipboard",
-    messariEmpty: "📊 [MARKET UPDATE]\nKhông tìm thấy dữ liệu token trong phản hồi Messari.",
-    messariHeader: "📊 [MARKET UPDATE]",
-    messariHint:
-      "Dữ liệu ATH / giá từ Messari. Muốn tin vĩ mô dài → dùng Perplexity Search Writer.",
-    messariPrice: "Giá hiện tại: {{price}}",
-    messariVol: "Vol 24h: {{vol}}",
-    messariMcap: "Market cap: {{mcap}}",
-    messariAthDown: "{{pct}}% dưới ATH",
     perplexityHeader: "🌍 [TIN TỨC VĨ MÔ]",
     perplexityEmpty: "🌍 [TIN TỨC VĨ MÔ]\nKhông có nội dung tìm kiếm.",
     surfHeader: "🏄 [BẢN TIN SURF CRYPTO]",
     surfEmpty: "🏄 [BẢN TIN SURF CRYPTO]\nKhông có nội dung feed trả về.",
-    surfTokenomicsHeader: "🧬 [SURF TOKENOMICS]",
-    surfTokenomicsEmpty: "🧬 [SURF TOKENOMICS]\nKhông có dữ liệu tokenomics trả về.",
     responseEmpty: "Phản hồi trống.",
   },
   hints: {
-    messariMismatch:
-      "Prompt này giống tin vĩ mô — hãy chọn **Web Search Writer** (~0.007 USDC). Messari chỉ trả giá/ATH token (~0.1 USDC), không viết bài dài.",
     perplexityMismatch:
-      "Prompt này giống dữ liệu thị trường — có thể dùng **Messari Token Analyst** cho ATH/giá on-chain.",
+      "Prompt này giống phân tích market-data — thử **Crypto Research Stack B** (~0.11 USDC) hoặc rút gọn thành câu tìm kiếm cho Web Search Writer.",
     surfNewsNoPrompt:
       "Surf Crypto News trả **feed tin cố định** từ API — ô prompt **không ảnh hưởng** kết quả. Cần trả lời theo câu hỏi? Chọn **Web Search Writer**.",
-    surfTokenomicsPartial:
-      "Surf Tokenomics chỉ đọc **mã token** trong prompt (API ?symbol=). Sẽ gọi symbol **{{symbol}}** — không phải phân tích câu văn đầy đủ.",
-    messariPartial:
-      "Messari chỉ lấy **BTC / ETH / SOL** (ATH, giá, volume) theo từ khóa trong prompt — không viết bài phân tích theo câu hỏi.",
     stackBFull:
-      "Stack B: **chỉ alt** (~0.22 USDC) — Exa narrative → Messari fundamentals → vaults.fyi yield → Gloria tin ×3. **Loại cứng** BTC, ETH, BNB, XRP & stable ở mọi bước.",
+      "Stack B: **chỉ alt** (~0.11 USDC) — Exa narrative → vaults.fyi yield → Gloria tin ×3. **Loại cứng** BTC, ETH, BNB, XRP & stable ở mọi bước.",
+    arcSonarFull:
+      "Arc Sonar Brief gửi prompt tới Perplexity Sonar qua x402. Nên hỏi về Arc, gas USDC hoặc hạ tầng stablecoin Circle.",
   },
   meta: {
     homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",
     homeDescription:
-      "Gọi Messari & Perplexity qua x402, định dạng thread X. Nạp USDC Base, không cần API key.",
+      "Gọi Surf & Exa qua x402, định dạng thread X. Nạp USDC Base, không cần API key.",
     marketplaceTitle: "Marketplace · Nano.Agent",
     marketplaceDescription: "Duyệt AI agents — trả theo lần gọi bằng USDC qua x402.",
   },

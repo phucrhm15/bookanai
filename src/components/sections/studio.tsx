@@ -8,19 +8,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Info, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { TweetThreadPreview } from "@/components/TweetThreadPreview";
-import { BASE_CHAIN_ID, BASE_NETWORK } from "@/lib/chains";
+import { BASE_CHAIN_ID, BASE_NETWORK, ARC_CHAIN_ID, ARC_NETWORK } from "@/lib/chains";
 import { postNanopayment } from "@/lib/wallet-api";
 import {
   agentPromptMismatch,
   defaultPromptForAgent,
   getAgentStudioInput,
 } from "@/lib/agent-prompt-hints";
+import { agentRunsOnArcTestnet } from "@/lib/mock-data";
+import { ARC_TESTNET_AGENT_IDS } from "@/lib/arc-agent-network";
+import { buildUniswapArcSwapUrl } from "@/lib/arc-testnet-ecosystem";
 import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
 import { translate } from "@/lib/i18n/translate";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import { useWallet, walletQueryKey } from "@/hooks/use-wallet";
 
 type GenState = "idle" | "authorizing" | "generating" | "done";
+type StudioErrorState = { message: string; swapUrl?: string } | null;
 
 export function Studio() {
   const { activeAgent } = useActiveAgent();
@@ -32,7 +36,9 @@ export function Studio() {
   const [prompt, setPrompt] = useState(() => defaultPromptForAgent(activeAgent.id, locale));
   const [state, setState] = useState<GenState>("idle");
   const [rawResponse, setRawResponse] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<StudioErrorState>(null);
   const payInFlight = useRef(false);
+  const swapWindowOpened = useRef(false);
 
   const studioInput = getAgentStudioInput(activeAgent.id, prompt, locale);
   const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
@@ -40,8 +46,47 @@ export function Studio() {
   useEffect(() => {
     setPrompt(defaultPromptForAgent(activeAgent.id, locale));
     setRawResponse(null);
+    setLastError(null);
     setState("idle");
   }, [activeAgent.id, locale]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible" || !swapWindowOpened.current) return;
+      swapWindowOpened.current = false;
+      void queryClient.invalidateQueries({ queryKey: walletQueryKey(userId) });
+      toast.success(t("studio.walletRefreshedAfterSwap"));
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [queryClient, t, userId]);
+
+  const extractRequiredAmount = (msg: string): number | undefined => {
+    const match = msg.match(/Cần ([\d.]+)|Required[:\s]+([\d.]+)/i);
+    const raw = match?.[1] ?? match?.[2];
+    if (!raw) return undefined;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  };
+
+  const inferSwapUrlFromError = (msg: string): string | undefined => {
+    const direct = msg.match(/https:\/\/app\.uniswap\.org\/swap\?[^\s)]+/i)?.[0];
+    if (direct) return direct;
+    if (/Insufficient|Số dư không đủ|INSUFFICIENT_BALANCE|Content Credits/i.test(msg)) {
+      const needed = extractRequiredAmount(msg) ?? activeAgent.price;
+      return buildUniswapArcSwapUrl({
+        tokenIn: "EURC",
+        tokenOut: "USDC",
+        amount: needed.toFixed(4),
+      });
+    }
+    return undefined;
+  };
+
+  const openSwapThenRetry = (url: string) => {
+    swapWindowOpened.current = true;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   const run = async () => {
     if (studioInput.showPrompt && !prompt.trim()) {
@@ -57,6 +102,7 @@ export function Studio() {
     }
     payInFlight.current = true;
     setRawResponse(null);
+    setLastError(null);
     setState("authorizing");
 
     const idempotencyKey =
@@ -71,7 +117,10 @@ export function Studio() {
       if (!wallet?.walletId) {
         throw new Error(t("studio.walletNotLoaded"));
       }
-      const chainId = wallet.preferredChainId ?? wallet.networks?.base?.id ?? BASE_CHAIN_ID;
+      const prefersArc = agentRunsOnArcTestnet(activeAgent.id);
+      const chainId = prefersArc
+        ? (wallet.networks?.arc?.id ?? ARC_CHAIN_ID)
+        : (wallet.preferredChainId ?? wallet.networks?.base?.id ?? BASE_CHAIN_ID);
       setState("generating");
       payment = await postNanopayment(
         wallet.walletId,
@@ -87,6 +136,7 @@ export function Studio() {
           ? err.message
           : t("studio.paymentFailedGeneric");
       const msg = formatNanopaymentError(raw, activeAgent.id, locale);
+      setLastError({ message: msg, swapUrl: inferSwapUrlFromError(msg) });
       toast.error(t("studio.paymentFailed"), { description: msg });
       setState("idle");
       return;
@@ -115,11 +165,17 @@ export function Studio() {
             balance: payment.ledgerBalance.toFixed(4),
             settlement,
           })
-        : `Paid via x402 on ${BASE_NETWORK.name}`,
+            : `Paid via x402 on ${
+                payment?.targetChainId === ARC_CHAIN_ID ? ARC_NETWORK.name : BASE_NETWORK.name
+              }`,
     });
   };
 
   const loading = state === "authorizing" || state === "generating";
+  const settlementNetwork =
+    agentRunsOnArcTestnet(activeAgent.id) || ARC_TESTNET_AGENT_IDS.has(activeAgent.id)
+      ? ARC_NETWORK.name
+      : BASE_NETWORK.name;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
@@ -204,7 +260,7 @@ export function Studio() {
             <div className="mt-4 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 <span className="text-success">●</span>{" "}
-                {t("studio.footerLine", { network: BASE_NETWORK.name })}
+                {t("studio.footerLine", { network: settlementNetwork })}
               </p>
               {!wallet?.walletId && !loading ? (
                 <p className="text-xs text-magenta sm:hidden">
@@ -238,6 +294,27 @@ export function Studio() {
                 )}
               </Button>
             </div>
+            {lastError ? (
+              <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                <p className="text-xs text-amber-200">{lastError.message}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {lastError.swapUrl ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (lastError.swapUrl) openSwapThenRetry(lastError.swapUrl);
+                      }}
+                    >
+                      {t("studio.swapThenRetry")}
+                    </Button>
+                  ) : null}
+                  <Button size="sm" variant="outline" onClick={run} disabled={loading || !wallet?.walletId}>
+                    {t("studio.retryRun")}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-[10px] uppercase tracking-wider">

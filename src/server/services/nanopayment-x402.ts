@@ -1,10 +1,10 @@
 /**
  * Iron-clad x402 nanopayment — Circle Agents Marketplace only.
  *
- * Protocol order (exact x402 — Exa, Messari, Stack B):
+ * Protocol order (exact x402 — Exa, Stack B):
  *  3. SQLite debit → 4. User wallet → x402 payer (Base) → 5. master pays API
  *
- * Gateway Polygon (Surf):
+ * Gateway Polygon (Surf Crypto News):
  *  3. Pre-check master Gateway Polygon → 4. SQLite debit → 5. Gateway pay → 6. User → x402 (Base)
  *
  * On failure before user on-chain transfer: SQLite refund.
@@ -74,34 +74,6 @@ function assertAgentResponseUsable(data: unknown, bodyText: string): void {
   }
 }
 
-function messariAthQuery(prompt?: string): string {
-  const params = new URLSearchParams({
-    slugs: "bitcoin,ethereum,solana",
-    limit: "5",
-  });
-  const q = prompt?.trim().toLowerCase() ?? "";
-  if (q.includes("eth") && !q.includes("bitcoin")) {
-    params.set("slugs", "ethereum");
-    params.set("limit", "3");
-  } else if (q.includes("sol")) {
-    params.set("slugs", "bitcoin,ethereum,solana");
-  }
-  return params.toString();
-}
-
-function inferSurfSymbol(prompt?: string): string {
-  const text = (prompt ?? "").toUpperCase();
-  const fromDollar = text.match(/\$([A-Z0-9]{2,12})\b/);
-  if (fromDollar?.[1]) return fromDollar[1];
-  const candidates = text.match(/\b[A-Z]{2,12}\b/g) ?? [];
-  for (const token of candidates) {
-    if (!["API", "JSON", "HTTP", "USDC", "BASE", "X", "THREAD"].includes(token)) {
-      return token;
-    }
-  }
-  return "AAVE";
-}
-
 export function payOptionsForAgent(
   agentServiceId: string,
   prompt?: string,
@@ -118,33 +90,33 @@ export function payOptionsForAgent(
       },
     };
   }
-  if (agentServiceId === "messari-analyst") {
+  if (agentServiceId === "surf-news") {
     return { method: "GET", headers: { Accept: "application/json" } };
   }
-  if (agentServiceId === "surf-news" || agentServiceId === "surf-tokenomics") {
+  if (agentServiceId === "arc-market-pulse") {
     return { method: "GET", headers: { Accept: "application/json" } };
+  }
+  if (agentServiceId === "arc-sonar-brief") {
+    const q =
+      prompt?.trim() ||
+      "Explain why USDC as native gas on Arc blockchain matters for autonomous AI agents and nanopayments.";
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: { query: q },
+    };
   }
   return undefined;
 }
 
-/** Append Messari query params to the resolved x402 resource URL. */
+/** Append agent-specific query params to the resolved x402 resource URL. */
 export function withAgentResourceQuery(
   agentServiceId: string,
   resourceUrl: string,
-  prompt?: string,
+  _prompt?: string,
 ): string {
-  if (agentServiceId === "messari-analyst") {
-    const sep = resourceUrl.includes("?") ? "&" : "?";
-    return `${resourceUrl}${sep}${messariAthQuery(prompt)}`;
-  }
-  if (agentServiceId === "surf-tokenomics") {
-    // Surf tokenomics requires one of `id` or `symbol`.
-    const u = new URL(resourceUrl);
-    if (!u.searchParams.has("id") && !u.searchParams.has("symbol")) {
-      u.searchParams.set("symbol", inferSurfSymbol(prompt));
-    }
-    return u.toString();
-  }
+  void agentServiceId;
+  void _prompt;
   return resourceUrl;
 }
 
@@ -243,11 +215,16 @@ export async function processNanopaymentX402(
   const spendable = credits.spendableCreditsUsdc;
 
   if (spendable < agentPriceUsdc) {
+    const arcHint = agentUsesGatewayPolygonPay(agentServiceId)
+      ? ""
+      : agentServiceId.startsWith("arc-")
+        ? " Agent Arc: KEY TEST dùng faucet Arc USDC; KEY LIVE settle trên Base."
+        : "";
     throw new CircleServiceError(
       `${INSUFFICIENT_MSG}. Cần ${agentPriceUsdc} USDC, khả dụng ${spendable.toFixed(6)} USDC ` +
         `(ledger ${credits.ledgerBalance.toFixed(6)}, ví on-chain ${unified.totalUsdc.toFixed(6)}, ` +
         `đang giữ chuyển ${credits.holdUsdc.toFixed(6)}). ` +
-        `Nạp USDC Base vào ví Content Credits hoặc mở Wallet để đồng bộ.`,
+        `Nạp USDC Base vào ví Content Credits hoặc mở Wallet để đồng bộ.${arcHint}`,
       "INSUFFICIENT_BALANCE",
     );
   }

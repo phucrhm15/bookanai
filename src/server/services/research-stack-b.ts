@@ -1,9 +1,8 @@
 /**
- * Stack B — alt-coin research workflow (~$0.22 / run):
+ * Stack B — alt-coin research workflow (~$0.11 / run):
  *   1. Exa web search
- *   2. Messari asset details (slugs from prompt + Exa)
- *   3. vaults.fyi networks + vaults
- *   4. Gloria news-ticker-summary × 3 tickers
+ *   2. vaults.fyi networks + vaults
+ *   3. Gloria news-ticker-summary × 3 tickers
  */
 import { isSupportedChainId, type SupportedChainId } from "@/lib/chains";
 import { ledgerLabelRefundX402, ledgerLabelX402 } from "@/server/ledger-label-keys";
@@ -32,15 +31,13 @@ export const RESEARCH_STACK_B_AGENT_ID = "crypto-research-b";
 export const RESEARCH_STACK_B_ROUTE_BUDGET_MS = 120_000;
 
 const EXA_URL = "https://api.exa.ai/search";
-const MESSARI_DETAILS_URL = "https://api.messari.io/metrics/v2/assets/details";
 const VAULTS_NETWORKS_URL = "https://api.vaults.fyi/v2/networks";
 const VAULTS_VAULTS_URL = "https://api.vaults.fyi/v2/vaults";
 const GLORIA_TICKER_URL = "https://api.itsgloria.ai/news-ticker-summary";
 
-/** Per-step fallback when live probe is skipped (sum ≈ 0.218 USDC). */
+/** Per-step fallback when live probe is skipped (sum ≈ 0.11 USDC). */
 const STEP_PRICES = {
   exa: 0.007,
-  messari: 0.1,
   vaultsNetworks: 0.005,
   vaultsVaults: 0.005,
   gloria: 0.031,
@@ -49,11 +46,7 @@ const STEP_PRICES = {
 import {
   buildStackBExaQuery,
   extractAltTickersFromText,
-  extractMessariSymbols,
-  filterAltSlugs,
   gloriaTickersForStackB,
-  messariSlugsForStackB,
-  TICKER_TO_SLUG,
 } from "@/lib/stack-b-exclusions";
 
 function assertUsable(data: unknown, bodyText: string, step: string): void {
@@ -80,7 +73,7 @@ function assertUsable(data: unknown, bodyText: string, step: string): void {
 
 type StepKey = keyof typeof STEP_PRICES;
 
-function extractFromExaData(data: unknown): { tickers: string[]; slugs: string[] } {
+function extractFromExaData(data: unknown): { tickers: string[] } {
   const textParts: string[] = [];
   const root = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
   const results = root?.results;
@@ -97,10 +90,7 @@ function extractFromExaData(data: unknown): { tickers: string[]; slugs: string[]
     }
   }
   const tickers = extractAltTickersFromText(textParts.join("\n"));
-  const slugs = filterAltSlugs(
-    tickers.map((t) => TICKER_TO_SLUG[t]).filter((s): s is string => Boolean(s)),
-  );
-  return { tickers, slugs };
+  return { tickers };
 }
 
 function stepPrice(step: StepKey): number {
@@ -110,7 +100,6 @@ function stepPrice(step: StepKey): number {
 function stackTotalUsdc(): number {
   return (
     STEP_PRICES.exa +
-    STEP_PRICES.messari +
     STEP_PRICES.vaultsNetworks +
     STEP_PRICES.vaultsVaults +
     STEP_PRICES.gloria * 3
@@ -237,15 +226,9 @@ export async function processResearchStackB(
     );
     actualSpentUsdc += stepPrice("exa");
 
-    const { tickers: exaTickers, slugs: exaSlugs } = extractFromExaData(exa.data);
-    const messariSlugCsv = messariSlugsForStackB(userPrompt, exaSlugs);
+    const { tickers: exaTickers } = extractFromExaData(exa.data);
 
-    const messariUrl = `${MESSARI_DETAILS_URL}?slugs=${encodeURIComponent(messariSlugCsv)}&limit=10`;
-    const [messari, vaultsNetworks, vaultsVaults] = await Promise.all([
-      payStep("messari", messariUrl, targetChainId as SupportedChainId, {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      }),
+    const [vaultsNetworks, vaultsVaults] = await Promise.all([
       payStep("vaultsNetworks", VAULTS_NETWORKS_URL, targetChainId as SupportedChainId, {
         method: "GET",
         headers: { Accept: "application/json", "x-402-auth": "true" },
@@ -255,10 +238,9 @@ export async function processResearchStackB(
         headers: { Accept: "application/json", "x-402-auth": "true" },
       }),
     ]);
-    actualSpentUsdc += stepPrice("messari") + stepPrice("vaultsNetworks") + stepPrice("vaultsVaults");
+    actualSpentUsdc += stepPrice("vaultsNetworks") + stepPrice("vaultsVaults");
 
-    const messariSymbols = extractMessariSymbols(messari.data);
-    const gloriaTickers = gloriaTickersForStackB(userPrompt, exaTickers, messariSymbols);
+    const gloriaTickers = gloriaTickersForStackB(userPrompt, exaTickers);
 
     const gloria: Record<string, StackBStepResult> = {};
     for (const ticker of gloriaTickers) {
@@ -273,10 +255,9 @@ export async function processResearchStackB(
     const report: StackBReport = {
       stack: "B",
       prompt: userPrompt,
-      messariSlugs: messariSlugCsv.split(",").filter(Boolean),
       gloriaTickers,
       chargedUsdc: totalUsdc,
-      steps: { exa, messari, vaultsNetworks, vaultsVaults, gloria },
+      steps: { exa, vaultsNetworks, vaultsVaults, gloria },
     };
 
     const rawResponse = JSON.stringify(report);

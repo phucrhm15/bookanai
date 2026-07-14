@@ -12,7 +12,7 @@ export const ARC_MEMO_CONTRACT_ADDRESS =
 
 /** Multicall3From — batch calls preserving original msg.sender (Zero7 / v0.7.2). */
 export const ARC_MULTICALL3_FROM_ADDRESS =
-  "0xEb7c69996e36d933e08216c278065b267598e980" as const;
+  "0xEb7c69996E36D933E08216c278065b267598E980" as const;
 
 export const ARC_MEMO_ABI = parseAbi([
   "function sendWithMemo(address to, uint256 amount, bytes memo)",

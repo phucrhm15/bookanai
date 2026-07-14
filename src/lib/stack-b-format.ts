@@ -1,5 +1,4 @@
 import {
-  filterMessariRow,
   isExcludedVaultName,
   isMacroExaResult,
   isValidAltTicker,
@@ -14,12 +13,10 @@ export type StackBStepResult = {
 export type StackBReport = {
   stack: "B";
   prompt: string;
-  messariSlugs: string[];
   gloriaTickers: string[];
   chargedUsdc: number;
   steps: {
     exa: StackBStepResult;
-    messari: StackBStepResult;
     vaultsNetworks: StackBStepResult;
     vaultsVaults: StackBStepResult;
     gloria: Record<string, StackBStepResult>;
@@ -35,17 +32,6 @@ export function isStackBReport(value: unknown): value is StackBReport {
   );
 }
 
-function messariRows(data: unknown): Record<string, unknown>[] {
-  const root =
-    data && typeof data === "object" && "data" in (data as object)
-      ? (data as { data: unknown }).data
-      : data;
-  if (!Array.isArray(root)) return [];
-  return root
-    .map((row) => (row && typeof row === "object" ? (row as Record<string, unknown>) : null))
-    .filter((r): r is Record<string, unknown> => r !== null);
-}
-
 function vaultItems(data: unknown): Record<string, unknown>[] {
   const root = data as { data?: unknown[] } | unknown[];
   const list = Array.isArray(root) ? root : Array.isArray(root?.data) ? root.data : [];
@@ -59,7 +45,7 @@ export function formatStackBForDisplay(report: StackBReport): string {
   const lines: string[] = [
     "🔬 **ALTCOIN RESEARCH — STACK B**",
     "_Universe: mid-cap alts only · ex BTC, ETH, BNB, XRP & all stables_",
-    `~${report.chargedUsdc.toFixed(3)} USDC · Exa + Messari + vaults.fyi + Gloria ×${report.gloriaTickers.length}`,
+    `~${report.chargedUsdc.toFixed(3)} USDC · Exa + vaults.fyi + Gloria ×${report.gloriaTickers.length}`,
     "",
     "🌍 **NARRATIVES (Exa)**",
   ];
@@ -87,26 +73,6 @@ export function formatStackBForDisplay(report: StackBReport): string {
     exaShown++;
   }
   if (!exaShown) lines.push("• (no alt-focused narrative hits — try refining prompt)");
-
-  lines.push("", "📊 **FUNDAMENTALS (Messari)**");
-  const assets = messariRows(report.steps.messari.data).filter(filterMessariRow);
-  if (assets.length) {
-    for (const asset of assets.slice(0, 8)) {
-      const sym = String(asset.symbol ?? "?").toUpperCase();
-      const name = typeof asset.name === "string" ? asset.name : sym;
-      const rank = asset.rank != null ? `#${asset.rank}` : "";
-      const sector =
-        typeof asset.sector === "string"
-          ? asset.sector
-          : typeof asset.category === "string"
-            ? asset.category
-            : "";
-      const sectorBit = sector ? ` · ${sector}` : "";
-      lines.push(`• **${sym}** ${name} ${rank}${sectorBit}`.trim());
-    }
-  } else {
-    lines.push("• (no alt assets after exclusion filter)");
-  }
 
   lines.push("", "🏦 **DEFI YIELDS (vaults.fyi — alts only)**");
   const networks = report.steps.vaultsNetworks.data;

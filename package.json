@@ -34,6 +34,8 @@
     "peek:wallet": "tsx scripts/peek-wallet.ts",
     "recover:usdc": "node scripts/recover-usdc-transfer.mjs",
     "cron:settle": "tsx scripts/run-settle-batch.ts",
+    "arc:batch-memo": "tsx scripts/arc-batch-memo-test.ts",
+    "arc:faucet-drip": "tsx scripts/arc-faucet-drip.ts",
     "fix:stale-settlements": "tsx scripts/release-stale-settlements.ts",
     "gateway:status": "tsx scripts/gateway-status.ts",
     "gateway:deposit": "tsx scripts/gateway-deposit.ts",

@@ -338,15 +338,3 @@ export const vi: typeof en = {
     marketplaceDescription: "Duyệt AI agents — trả theo lần gọi bằng USDC qua x402.",
   },
 };
-* BTC, ETH, BNB, XRP & stable ở mọi bước.",
-    arcSonarFull:
-      "Arc Sonar Brief gửi prompt tới Perplexity Sonar qua x402. Nên hỏi về Arc, gas USDC hoặc hạ tầng stablecoin Circle.",
-  },
-  meta: {
-    homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",
-    homeDescription:
-      "Gọi Surf & Exa qua x402, định dạng thread X. Nạp USDC Base, không cần API key.",
-    marketplaceTitle: "Marketplace · Nano.Agent",
-    marketplaceDescription: "Duyệt AI agents — trả theo lần gọi bằng USDC qua x402.",
-  },
-};

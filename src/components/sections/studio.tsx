@@ -168,9 +168,7 @@ export function Studio() {
             balance: payment.ledgerBalance.toFixed(4),
             settlement,
           })
-            : `Paid via x402 on ${
-                payment?.targetChainId === ARC_CHAIN_ID ? ARC_NETWORK.name : BASE_NETWORK.name
-              }`,
+            : `Paid via x402 on ${settlementNetwork}`,
     });
   };
 

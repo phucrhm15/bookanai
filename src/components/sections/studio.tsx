@@ -8,15 +8,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Info, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { TweetThreadPreview } from "@/components/TweetThreadPreview";
-import { BASE_CHAIN_ID, BASE_NETWORK, ARC_CHAIN_ID, ARC_NETWORK } from "@/lib/chains";
+import { BASE_CHAIN_ID, BASE_NETWORK, ARC_CHAIN_ID, ARC_NETWORK, ARC_MAINNET_CHAIN_ID, ARC_MAINNET_NETWORK } from "@/lib/chains";
 import { postNanopayment } from "@/lib/wallet-api";
 import {
   agentPromptMismatch,
   defaultPromptForAgent,
   getAgentStudioInput,
 } from "@/lib/agent-prompt-hints";
-import { agentRunsOnArcTestnet } from "@/lib/mock-data";
-import { ARC_TESTNET_AGENT_IDS } from "@/lib/arc-agent-network";
+import { agentRunsOnArcTestnet, agentRunsOnArcMainnet } from "@/lib/mock-data";
+import { ARC_TESTNET_AGENT_IDS, ARC_MAINNET_AGENT_IDS } from "@/lib/arc-agent-network";
 import { buildUniswapArcSwapUrl } from "@/lib/arc-testnet-ecosystem";
 import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
 import { translate } from "@/lib/i18n/translate";
@@ -117,10 +117,13 @@ export function Studio() {
       if (!wallet?.walletId) {
         throw new Error(t("studio.walletNotLoaded"));
       }
-      const prefersArc = agentRunsOnArcTestnet(activeAgent.id);
-      const chainId = prefersArc
-        ? (wallet.networks?.arc?.id ?? ARC_CHAIN_ID)
-        : (wallet.preferredChainId ?? wallet.networks?.base?.id ?? BASE_CHAIN_ID);
+      const prefersArcMainnet = agentRunsOnArcMainnet(activeAgent.id);
+      const prefersArcTestnet = agentRunsOnArcTestnet(activeAgent.id);
+      const chainId = prefersArcMainnet
+        ? ARC_MAINNET_CHAIN_ID
+        : prefersArcTestnet
+          ? (wallet.networks?.arc?.id ?? ARC_CHAIN_ID)
+          : (wallet.preferredChainId ?? wallet.networks?.base?.id ?? BASE_CHAIN_ID);
       setState("generating");
       payment = await postNanopayment(
         wallet.walletId,
@@ -173,9 +176,11 @@ export function Studio() {
 
   const loading = state === "authorizing" || state === "generating";
   const settlementNetwork =
-    agentRunsOnArcTestnet(activeAgent.id) || ARC_TESTNET_AGENT_IDS.has(activeAgent.id)
-      ? ARC_NETWORK.name
-      : BASE_NETWORK.name;
+    agentRunsOnArcMainnet(activeAgent.id) || ARC_MAINNET_AGENT_IDS.has(activeAgent.id)
+      ? ARC_MAINNET_NETWORK.name
+      : agentRunsOnArcTestnet(activeAgent.id) || ARC_TESTNET_AGENT_IDS.has(activeAgent.id)
+        ? ARC_NETWORK.name
+        : BASE_NETWORK.name;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">

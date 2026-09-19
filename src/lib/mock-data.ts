@@ -1,4 +1,4 @@
-export type AgentNetwork = "base" | "arc-testnet";
+export type AgentNetwork = "base" | "arc-testnet" | "arc";
 
 export type Agent = {
   id: string;
@@ -81,6 +81,46 @@ export const AGENTS: Agent[] = [
     baseUrl: "https://api.aisa.one",
     network: "arc-testnet",
   },
+  // ── Arc Mainnet agents ─────────────────────────────────────────
+  {
+    id: "arc-defi-oracle",
+    name: "Arc DeFi Oracle",
+    handle: "@arc_defi",
+    category: "Arc Mainnet",
+    price: 0.012,
+    description:
+      "Live DeFi protocol data on Arc Mainnet — TVL, yields, swap routes via x402. USDC is native gas; no ETH needed. ~0.012 USDC/run.",
+    emoji: "⚡",
+    accent: "lime",
+    baseUrl: "https://api.aisa.one",
+    network: "arc",
+  },
+  {
+    id: "arc-mainnet-pulse",
+    name: "Arc Mainnet Pulse",
+    handle: "@arc_main_pulse",
+    category: "Arc Mainnet",
+    price: 0.015,
+    description:
+      "Live on-chain metrics for Arc Mainnet: USDC flows, transaction volume, top contracts. Real-time via x402. ~0.015 USDC/run.",
+    emoji: "🔥",
+    accent: "cyan",
+    baseUrl: "https://api.aisa.one",
+    network: "arc",
+  },
+  {
+    id: "arc-chain-analytics",
+    name: "Arc Chain Analytics",
+    handle: "@arc_analytics",
+    category: "Arc Mainnet",
+    price: 0.02,
+    description:
+      "CCTP bridge volume, wallet flows, contract activity on Arc Mainnet. Deep-dive onchain analytics via x402. ~0.02 USDC/run.",
+    emoji: "📊",
+    accent: "magenta",
+    baseUrl: "https://api.aisa.one",
+    network: "arc",
+  },
 ];
 
 export type Transaction = {
@@ -141,4 +181,13 @@ export const AGENT_SERVICES_COUNT = AGENTS.length;
 
 export function agentRunsOnArcTestnet(agentId: string): boolean {
   return AGENTS.find((a) => a.id === agentId)?.network === "arc-testnet";
+}
+
+export function agentRunsOnArcMainnet(agentId: string): boolean {
+  return AGENTS.find((a) => a.id === agentId)?.network === "arc";
+}
+
+export function agentRunsOnArc(agentId: string): boolean {
+  const n = AGENTS.find((a) => a.id === agentId)?.network;
+  return n === "arc-testnet" || n === "arc";
 }

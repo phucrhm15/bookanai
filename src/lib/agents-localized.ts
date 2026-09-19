@@ -34,3 +34,7 @@ export function getLocalizedAgentsByNetwork(
 ): Agent[] {
   return getLocalizedAgents(locale).filter((a) => a.network === network);
 }
+
+export function getLocalizedArcMainnetAgents(locale: Locale): Agent[] {
+  return getLocalizedAgents(locale).filter((a) => a.network === "arc");
+}

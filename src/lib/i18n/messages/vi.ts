@@ -59,7 +59,9 @@ export const vi: typeof en = {
     toastActiveDesc: "{{price}} USDC mỗi lần gọi",
     sectionBase: "Base · mainnet x402",
     sectionArc: "Arc Testnet · gas USDC",
+    sectionArcMainnet: "Arc Mainnet · USDC thật",
     badgeArc: "Arc Testnet",
+    badgeArcMainnet: "Arc Mainnet",
     badgeBase: "Base",
   },
   agents: {
@@ -325,6 +327,18 @@ export const vi: typeof en = {
       "Surf Crypto News trả **feed tin cố định** từ API — ô prompt **không ảnh hưởng** kết quả. Cần trả lời theo câu hỏi? Chọn **Web Search Writer**.",
     stackBFull:
       "Stack B: **chỉ alt** (~0.11 USDC) — Exa narrative → vaults.fyi yield → Gloria tin ×3. **Loại cứng** BTC, ETH, BNB, XRP & stable ở mọi bước.",
+    arcSonarFull:
+      "Arc Sonar Brief gửi prompt tới Perplexity Sonar qua x402. Nên hỏi về Arc, gas USDC hoặc hạ tầng stablecoin Circle.",
+  },
+  meta: {
+    homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",
+    homeDescription:
+      "Gọi Surf & Exa qua x402, định dạng thread X. Nạp USDC Base, không cần API key.",
+    marketplaceTitle: "Marketplace · Nano.Agent",
+    marketplaceDescription: "Duyệt AI agents — trả theo lần gọi bằng USDC qua x402.",
+  },
+};
+* BTC, ETH, BNB, XRP & stable ở mọi bước.",
     arcSonarFull:
       "Arc Sonar Brief gửi prompt tới Perplexity Sonar qua x402. Nên hỏi về Arc, gas USDC hoặc hạ tầng stablecoin Circle.",
   },

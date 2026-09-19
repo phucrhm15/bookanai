@@ -85,6 +85,21 @@ export const en = {
         "Perplexity Sonar research brief via x402 — Arc / USDC-native gas prompts. Arc Testnet settlement path.",
       category: "Arc Testnet",
     },
+    arcDefiOracle: {
+      description:
+        "Live DeFi protocol data on Arc Mainnet — TVL, yields, swap routes via x402. USDC is native gas. ~0.012 USDC/run.",
+      category: "Arc Mainnet",
+    },
+    arcMainnetPulse: {
+      description:
+        "Live on-chain metrics for Arc Mainnet: USDC flows, transaction volume, top contracts. ~0.015 USDC/run.",
+      category: "Arc Mainnet",
+    },
+    arcChainAnalytics: {
+      description:
+        "CCTP bridge volume, wallet flows, contract activity on Arc Mainnet. Deep-dive onchain analytics. ~0.02 USDC/run.",
+      category: "Arc Mainnet",
+    },
   },
   studio: {
     badge: "Studio",

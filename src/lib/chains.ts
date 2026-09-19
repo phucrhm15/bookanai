@@ -7,6 +7,9 @@ export const POLYGON_CHAIN_ID = 137 as const;
 /** Arc Testnet — Circle unified balance id `Arc_Testnet`, DCW blockchain `ARC-TESTNET` */
 export const ARC_CHAIN_ID = 5042002 as const;
 
+/** Arc Mainnet — Circle unified balance id `Arc`, DCW blockchain `ARC` */
+export const ARC_MAINNET_CHAIN_ID = 5042 as const;
+
 export const BASE_USDC_CONTRACT_ADDRESS =
   "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
 
@@ -32,34 +35,54 @@ export const ARC_NETWORK = {
     "Only send USDC on Arc Testnet using the contract address below. Other tokens or networks will result in permanent loss of funds.",
 } as const;
 
+export const ARC_MAINNET_NETWORK = {
+  name: "Arc",
+  id: ARC_MAINNET_CHAIN_ID,
+  usdcContractAddress: ARC_MAINNET_USDC_CONTRACT_ADDRESS,
+  depositWarning:
+    "Only send USDC on Arc Mainnet. Real funds — transactions are irreversible.",
+} as const;
+
 export const DCW_BLOCKCHAIN_BASE = "BASE" as const;
 export const DCW_BLOCKCHAIN_ARC = "ARC-TESTNET" as const;
+export const DCW_BLOCKCHAIN_ARC_MAINNET = "ARC" as const;
 
 export const UB_CHAIN_BASE = "Base" as const;
 export const UB_CHAIN_ARC = "Arc_Testnet" as const;
+export const UB_CHAIN_ARC_MAINNET = "Arc" as const;
 
-export type SupportedChainId = typeof BASE_CHAIN_ID | typeof ARC_CHAIN_ID;
+export type SupportedChainId =
+  | typeof BASE_CHAIN_ID
+  | typeof ARC_CHAIN_ID
+  | typeof ARC_MAINNET_CHAIN_ID;
 
 export function isSupportedChainId(chainId: number): chainId is SupportedChainId {
-  return chainId === BASE_CHAIN_ID || chainId === ARC_CHAIN_ID;
+  return chainId === BASE_CHAIN_ID || chainId === ARC_CHAIN_ID || chainId === ARC_MAINNET_CHAIN_ID;
 }
 
 export function dcwBlockchainForChainId(chainId: SupportedChainId): string {
-  return chainId === BASE_CHAIN_ID ? DCW_BLOCKCHAIN_BASE : DCW_BLOCKCHAIN_ARC;
+  if (chainId === BASE_CHAIN_ID) return DCW_BLOCKCHAIN_BASE;
+  if (chainId === ARC_MAINNET_CHAIN_ID) return DCW_BLOCKCHAIN_ARC_MAINNET;
+  return DCW_BLOCKCHAIN_ARC;
 }
 
 export function unifiedBalanceChainForChainId(chainId: SupportedChainId): string {
-  return chainId === BASE_CHAIN_ID ? UB_CHAIN_BASE : UB_CHAIN_ARC;
+  if (chainId === BASE_CHAIN_ID) return UB_CHAIN_BASE;
+  if (chainId === ARC_MAINNET_CHAIN_ID) return UB_CHAIN_ARC_MAINNET;
+  return UB_CHAIN_ARC;
 }
 
 export function gatewayChainKeyForChainId(
   chainId: SupportedChainId,
-): "base" | "arcTestnet" {
-  return chainId === BASE_CHAIN_ID ? "base" : "arcTestnet";
+): "base" | "arcTestnet" | "arc" {
+  if (chainId === BASE_CHAIN_ID) return "base";
+  if (chainId === ARC_MAINNET_CHAIN_ID) return "arc";
+  return "arcTestnet";
 }
 
 export function defaultChainIdForAgentNetwork(network?: string): SupportedChainId {
   const n = (network ?? "").toLowerCase();
   if (n.includes("base")) return BASE_CHAIN_ID;
+  if (n === "arc" || n === "arc-mainnet") return ARC_MAINNET_CHAIN_ID;
   return ARC_CHAIN_ID;
 }

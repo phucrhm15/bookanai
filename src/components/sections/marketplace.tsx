@@ -29,16 +29,19 @@ function AgentCard({
   onOpenStudio: () => void;
 }) {
   const { t } = useTranslation();
-  const isArc = agent.network === "arc-testnet";
+  const isArcTestnet = agent.network === "arc-testnet";
+  const isArcMainnet = agent.network === "arc";
 
   return (
     <article
       className={cn(
         "group relative overflow-hidden rounded-xl border bg-gradient-panel p-5 transition-all",
         active
-          ? isArc
-            ? "border-lime-400/50 shadow-[0_0_24px_rgba(163,230,53,0.15)]"
-            : "border-primary/60 shadow-neon"
+          ? isArcMainnet
+            ? "border-yellow-400/50 shadow-[0_0_24px_rgba(251,191,36,0.15)]"
+            : isArcTestnet
+              ? "border-lime-400/50 shadow-[0_0_24px_rgba(163,230,53,0.15)]"
+              : "border-primary/60 shadow-neon"
           : "border-border/60 hover:border-primary/40 hover:shadow-neon",
       )}
     >
@@ -57,10 +60,15 @@ function AgentCard({
             variant="outline"
             className={cn(
               "font-mono text-[10px] uppercase tracking-wider",
-              isArc && "border-lime-400/40 bg-lime-400/10 text-lime-300",
+              isArcMainnet && "border-yellow-400/40 bg-yellow-400/10 text-yellow-300",
+              isArcTestnet && "border-lime-400/40 bg-lime-400/10 text-lime-300",
             )}
           >
-            {isArc ? t("marketplace.badgeArc") : t("marketplace.badgeBase")}
+            {isArcMainnet
+              ? t("marketplace.badgeArcMainnet")
+              : isArcTestnet
+                ? t("marketplace.badgeArc")
+                : t("marketplace.badgeBase")}
           </Badge>
           <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
             {agent.category}
@@ -136,6 +144,7 @@ export function Marketplace() {
 
   const baseAgents = filtered.filter((a) => a.network === "base");
   const arcAgents = filtered.filter((a) => a.network === "arc-testnet");
+  const arcMainnetAgents = filtered.filter((a) => a.network === "arc");
 
   const onSelect = (agent: Agent) => {
     setActiveAgent(agent);
@@ -192,6 +201,26 @@ export function Marketplace() {
           </h2>
           <div className="grid gap-5 sm:grid-cols-2">
             {baseAgents.map((agent) => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                active={activeAgent.id === agent.id}
+                onSelect={onSelect}
+                onOpenStudio={() => navigate({ to: "/studio" })}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {arcMainnetAgents.length > 0 ? (
+        <section className="mb-10">
+          <h2 className="mb-4 font-mono text-[11px] uppercase tracking-[0.2em]"
+            style={{ color: "#fbbf24" }}>
+            ⚡ {t("marketplace.sectionArcMainnet")}
+          </h2>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {arcMainnetAgents.map((agent) => (
               <AgentCard
                 key={agent.id}
                 agent={agent}

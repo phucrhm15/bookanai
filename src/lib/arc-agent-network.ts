@@ -2,7 +2,7 @@
  * Arc Testnet agent network gateway — auto-select payment chain from x402 accepts.
  * Register agent ids in ARC_TESTNET_AGENT_IDS for Arc-branded Studio agents.
  */
-import { ARC_CHAIN_ID, BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
+import { ARC_CHAIN_ID, ARC_MAINNET_CHAIN_ID, BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
 import { defaultPaymentChainId, isLiveCircleApiKey } from "@/lib/circle-dcw-blockchains";
 import { priceUsdcFromDiscoveryAccepts } from "@/lib/x402-probe";
 
@@ -20,6 +20,15 @@ export type X402NetworkAccept = {
 export const ARC_TESTNET_AGENT_IDS = new Set<string>([
   "arc-market-pulse",
   "arc-sonar-brief",
+]);
+
+/**
+ * Agents running on Arc Mainnet (real USDC, chain ID 5042).
+ */
+export const ARC_MAINNET_AGENT_IDS = new Set<string>([
+  "arc-defi-oracle",
+  "arc-mainnet-pulse",
+  "arc-chain-analytics",
 ]);
 
 export function agentAcceptsArcTestnet(accepts?: X402NetworkAccept[]): boolean {
@@ -46,6 +55,10 @@ export function agentPrefersArcTestnet(
   return agentAcceptsArcTestnet(accepts);
 }
 
+export function agentPrefersArcMainnet(agentServiceId: string): boolean {
+  return ARC_MAINNET_AGENT_IDS.has(agentServiceId);
+}
+
 /**
  * Pick the chain for x402 nanopayment / user→master settlement.
  * - TEST API key → Arc Testnet for Arc agents (and when Discovery lists eip155:5042002).
@@ -61,6 +74,11 @@ export function resolveAgentPaymentChain(input: {
   const envDefault = defaultPaymentChainId(apiKey);
   const live = isLiveCircleApiKey(apiKey);
   const prefersArc = agentPrefersArcTestnet(agentServiceId, accepts);
+
+  // Arc Mainnet agents always use Arc Mainnet regardless of API key type.
+  if (agentPrefersArcMainnet(agentServiceId)) {
+    return ARC_MAINNET_CHAIN_ID;
+  }
 
   // LIVE keys: Circle rejects ARC-TESTNET wallets → always settle on Base.
   if (live) {

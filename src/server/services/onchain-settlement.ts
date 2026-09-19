@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { ARC_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
+import { ARC_CHAIN_ID, ARC_MAINNET_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
 import { buildArcNanopaymentMemo } from "@/lib/arc-transaction-extensions";
 import { getDb } from "@/server/db/client";
 import { ledgerEntries, pendingOnchainSettlements } from "@/server/db/schema";
@@ -336,8 +336,12 @@ async function processSettlementRows(
     (row) => !(row.status === "submitted" && row.circleTransactionId),
   );
 
-  const arcRows = actionable.filter((row) => row.targetChainId === ARC_CHAIN_ID);
-  const baseRows = actionable.filter((row) => row.targetChainId !== ARC_CHAIN_ID);
+  const arcRows = actionable.filter(
+    (row) => row.targetChainId === ARC_CHAIN_ID || row.targetChainId === ARC_MAINNET_CHAIN_ID,
+  );
+  const baseRows = actionable.filter(
+    (row) => row.targetChainId !== ARC_CHAIN_ID && row.targetChainId !== ARC_MAINNET_CHAIN_ID,
+  );
 
   await processArcSettlementBatches(db, arcRows, result);
   await processSequentialSettlements(db, baseRows, result);
@@ -447,7 +451,7 @@ async function processSingleArcSettlement(
     const circleTransactionId = await executeUserToMasterTransfer(
       row.circleWalletId,
       microToUsdc(row.amountMicroUsdc),
-      ARC_CHAIN_ID,
+      row.targetChainId as SupportedChainId,
       {
         ledgerEntryId: row.ledgerEntryId,
         agentId: ledger?.agentId ?? undefined,

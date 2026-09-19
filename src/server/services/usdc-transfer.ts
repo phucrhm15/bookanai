@@ -3,7 +3,9 @@ import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-
 import type { TransactionState } from "@circle-fin/developer-controlled-wallets";
 import {
   ARC_CHAIN_ID,
+  ARC_MAINNET_CHAIN_ID,
   ARC_USDC_CONTRACT_ADDRESS,
+  ARC_MAINNET_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
   BASE_NETWORK,
   type SupportedChainId,
@@ -231,7 +233,11 @@ export async function executeUserToMasterTransfer(
   }
 
   const tokenAddress =
-    targetChainId === BASE_NETWORK.id ? BASE_USDC_CONTRACT_ADDRESS : ARC_USDC_CONTRACT_ADDRESS;
+    targetChainId === BASE_NETWORK.id
+      ? BASE_USDC_CONTRACT_ADDRESS
+      : targetChainId === ARC_MAINNET_CHAIN_ID
+        ? ARC_MAINNET_USDC_CONTRACT_ADDRESS
+        : ARC_USDC_CONTRACT_ADDRESS;
   const blockchain = dcwBlockchainForPaymentChain(targetChainId);
   const client = getTransferClient();
 
@@ -272,7 +278,7 @@ export async function executeUserToMasterTransfer(
 }
 
 export function isArcTransferChain(chainId: SupportedChainId): boolean {
-  return chainId === ARC_CHAIN_ID;
+  return chainId === ARC_CHAIN_ID || chainId === ARC_MAINNET_CHAIN_ID;
 }
 
 export type { ArcNanopaymentMemo, ArcBatchTransferItem };

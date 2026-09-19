@@ -29,6 +29,10 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   /** Arc Testnet agents — Circle Discovery AIsa resources (pay Base today; settle Arc on TEST keys) */
   "arc-market-pulse": "https://api.aisa.one/apis/v2/coingecko/search/trending",
   "arc-sonar-brief": "https://api.aisa.one/apis/v2/perplexity/sonar",
+  /** Arc Mainnet agents — real USDC, chain 5042. Same AIsa x402 endpoints, settled on Arc Mainnet. */
+  "arc-defi-oracle": "https://api.aisa.one/apis/v2/coingecko/search/trending",
+  "arc-mainnet-pulse": "https://api.aisa.one/apis/v2/coingecko/search/trending",
+  "arc-chain-analytics": "https://api.aisa.one/apis/v2/perplexity/sonar",
 };
 
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
@@ -38,6 +42,10 @@ export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> =
   "crypto-research-b": 0.11,
   "arc-market-pulse": 0.008,
   "arc-sonar-brief": 0.008,
+  // Arc Mainnet agents — real USDC fallback prices
+  "arc-defi-oracle": 0.012,
+  "arc-mainnet-pulse": 0.015,
+  "arc-chain-analytics": 0.02,
 };
 
 /** Surf pays via Circle GatewayWalletBatched on Polygon — not Base exact x402. */

@@ -1,8 +1,10 @@
 import type { Blockchain } from "@circle-fin/developer-controlled-wallets";
 import {
   ARC_CHAIN_ID,
+  ARC_MAINNET_CHAIN_ID,
   BASE_CHAIN_ID,
   DCW_BLOCKCHAIN_ARC,
+  DCW_BLOCKCHAIN_ARC_MAINNET,
   DCW_BLOCKCHAIN_BASE,
   type SupportedChainId,
 } from "@/lib/chains";
@@ -31,5 +33,7 @@ export function defaultPaymentChainId(apiKey: string): SupportedChainId {
 }
 
 export function dcwBlockchainForPaymentChain(chainId: SupportedChainId): Blockchain {
-  return chainId === BASE_CHAIN_ID ? DCW_BLOCKCHAIN_BASE : DCW_BLOCKCHAIN_ARC;
+  if (chainId === BASE_CHAIN_ID) return DCW_BLOCKCHAIN_BASE;
+  if (chainId === ARC_MAINNET_CHAIN_ID) return DCW_BLOCKCHAIN_ARC_MAINNET as Blockchain;
+  return DCW_BLOCKCHAIN_ARC;
 }

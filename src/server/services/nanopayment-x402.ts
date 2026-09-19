@@ -106,6 +106,20 @@ export function payOptionsForAgent(
       body: { query: q },
     };
   }
+  // Arc Mainnet agents
+  if (agentServiceId === "arc-defi-oracle" || agentServiceId === "arc-mainnet-pulse") {
+    return { method: "GET", headers: { Accept: "application/json" } };
+  }
+  if (agentServiceId === "arc-chain-analytics") {
+    const q =
+      prompt?.trim() ||
+      "Analyze Arc Mainnet on-chain activity: USDC flows, top contracts, bridge volume from CCTP.";
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: { query: q },
+    };
+  }
   return undefined;
 }
 

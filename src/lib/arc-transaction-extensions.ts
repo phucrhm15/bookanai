@@ -4,7 +4,7 @@
  * @see https://docs.arc.io/arc/concepts/execution-layer
  */
 import { encodeFunctionData, parseAbi, parseUnits, toHex } from "viem";
-import { ARC_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
+import { ARC_CHAIN_ID, ARC_MAINNET_CHAIN_ID, type SupportedChainId } from "@/lib/chains";
 
 /** Memo contract — attach metadata to USDC transfers (Zero7 / v0.7.2). */
 export const ARC_MEMO_CONTRACT_ADDRESS =
@@ -42,8 +42,10 @@ export type ArcBatchTransferItem = {
   memo: ArcNanopaymentMemo;
 };
 
-export function isArcChain(chainId: number): chainId is typeof ARC_CHAIN_ID {
-  return chainId === ARC_CHAIN_ID;
+export function isArcChain(
+  chainId: number,
+): chainId is typeof ARC_CHAIN_ID | typeof ARC_MAINNET_CHAIN_ID {
+  return chainId === ARC_CHAIN_ID || chainId === ARC_MAINNET_CHAIN_ID;
 }
 
 /** ERC-20 USDC amount (6 decimals) for sendWithMemo `amount` param. */
@@ -130,5 +132,5 @@ export function encodeArcBatchAggregate3ValueCalldata(
 }
 
 export function arcExtensionsActive(chainId: SupportedChainId): boolean {
-  return isArcChain(chainId);
+  return chainId === ARC_CHAIN_ID || chainId === ARC_MAINNET_CHAIN_ID;
 }

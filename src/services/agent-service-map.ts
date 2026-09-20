@@ -23,7 +23,8 @@ type DiscoveryResponse = {
 export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   /** Exa web search — AIsa Perplexity removed from Circle Discovery (2026) */
   "perplexity-social": "https://api.exa.ai/search",
-  "surf-news": "https://nano.blockrun.ai/api/v1/surf/news/feed",
+  /** Polymarket crypto prediction market odds — replaces retired Surf feed (410 since 2026-09-10) */
+  "surf-news": "https://nano.blockrun.ai/api/v1/pm/polymarket/crypto-updown",
   /** Orchestrated multi-API workflow — probe uses Exa entry point */
   "crypto-research-b": "https://api.exa.ai/search",
   /** Arc Testnet agents — Circle Discovery AIsa resources (pay Base today; settle Arc on TEST keys) */
@@ -38,7 +39,7 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
 export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> = {
   "perplexity-social": 0.007,
-  "surf-news": 0.001,
+  "surf-news": 0.001, // Polymarket crypto-updown (nano.blockrun.ai)
   "crypto-research-b": 0.11,
   "arc-market-pulse": 0.008,
   "arc-sonar-brief": 0.008,

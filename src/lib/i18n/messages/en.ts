@@ -45,7 +45,7 @@ export const en = {
     title: "x402",
     titleAccent: "Data Agents",
     subtitle:
-      "Real APIs on Circle x402 — Base mainnet agents + Arc Testnet settlement path (USDC gas).",
+      "Real APIs on Circle x402 — Base + Polygon + Arc Mainnet agents. Pay per call with USDC.",
     searchPlaceholder: "Search agents…",
     agentsCount: "{{count}} of {{total}} agents",
     usdcPerRequest: "USDC / request",
@@ -69,8 +69,8 @@ export const en = {
     },
     surf: {
       description:
-        "AI-curated crypto headlines and social intelligence from Surf (~0.001 USDC/call).",
-      category: "News Feed",
+        "Live crypto prediction market odds from Polymarket (~0.001 USDC/call). Crypto up/down market sentiment.",
+      category: "Prediction Markets",
     },
     stackB: {
       description:
@@ -126,7 +126,7 @@ export const en = {
       "Explain Arc Testnet: USDC as native gas, nanopayments for AI agents, and why Circle built an L1 for stablecoins.",
     promptLabel: "Your prompt",
     agentNoteSurfNews:
-      "Surf Crypto News returns an **AI-curated crypto headline feed** (~0.001 USDC/run). No prompt needed — click Run Agent for the latest headlines from Surf (nano.blockrun.ai). For custom search queries, use **Web Search Writer**.",
+      "**Polymarket Pulse** returns live crypto prediction market odds (~0.001 USDC/run). No prompt needed — click Run Agent for the latest crypto up/down sentiment from Polymarket via nano.blockrun.ai. For custom search queries, use **Web Search Writer**.",
     agentNoteArcPulse:
       "Arc Market Pulse pulls **trending CoinGecko categories** via Circle x402 (~0.008 USDC). No prompt needed. With a TEST Circle key, settlement uses Arc Testnet (USDC gas). LIVE keys settle on Base.",
     promptEmpty: "Add a prompt first",

@@ -72,8 +72,8 @@ export const vi: typeof en = {
     },
     surf: {
       description:
-        "Tin crypto tuyển chọn bằng AI và social intelligence từ Surf (~0.001 USDC/lần).",
-      category: "Bản tin nhanh",
+        "Tỷ lệ cược thị trường dự báo crypto từ Polymarket (~0.001 USDC/lần). Tâm lý lên/xuống thị trường.",
+      category: "Thị trường Dự báo",
     },
     stackB: {
       description:
@@ -114,7 +114,7 @@ export const vi: typeof en = {
       "Giải thích Arc Testnet: USDC làm gas native, nanopayment cho AI agents, và vì sao Circle xây L1 cho stablecoin.",
     promptLabel: "Prompt của bạn",
     agentNoteSurfNews:
-      "Surf Crypto News trả **feed tin crypto được AI chọn lọc** (~0.001 USDC/lần). Không cần nhập prompt — bấm Chạy Agent để lấy headline mới nhất từ Surf (nano.blockrun.ai). Muốn tìm kiếm theo câu hỏi? Chọn **Web Search Writer**.",
+      "**Polymarket Pulse** trả tỷ lệ cược dự báo crypto trực tiếp từ Polymarket (~0.001 USDC/lần). Không cần prompt — bấm Chạy Agent để xem sentiment thị trường lên/xuống qua nano.blockrun.ai. Muốn tìm kiếm? Chọn **Web Search Writer**.",
     agentNoteArcPulse:
       "Arc Market Pulse lấy **danh mục trending CoinGecko** qua Circle x402 (~0.008 USDC). Không cần prompt. KEY TEST → settle trên Arc Testnet (gas USDC). KEY LIVE → settle trên Base.",
     promptEmpty: "Nhập prompt trước",

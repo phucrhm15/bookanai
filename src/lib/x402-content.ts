@@ -1,3 +1,27 @@
+/**
+ * Format Polymarket crypto-updown response as tweet thread.
+ * Response shape: { markets: [{ title, slug, volume24h, yesAsk, noBid, ... }] }
+ */
+function formatPolymarketCryptoUpdown(obj: Record<string, unknown>): string | null {
+  const markets = obj.markets ?? obj.results ?? obj.data;
+  if (!Array.isArray(markets) || markets.length === 0) return null;
+
+  const lines: string[] = ["📊 Polymarket Crypto Prediction Pulse\n"];
+  for (const m of markets.slice(0, 6)) {
+    const item = m as Record<string, unknown>;
+    const title = item.title ?? item.question ?? item.slug ?? "Unknown";
+    const yes = item.yesAsk ?? item.yes ?? item.yesBid ?? item.bestAsk;
+    const no = item.noBid ?? item.no ?? item.noAsk ?? item.bestBid;
+    const vol = item.volume24h ?? item.volume ?? item.liquidity;
+    const yesStr = typeof yes === "number" ? `${(yes * 100).toFixed(0)}¢ YES` : "";
+    const noStr = typeof no === "number" ? `${(no * 100).toFixed(0)}¢ NO` : "";
+    const volStr = typeof vol === "number" ? ` | Vol $${vol.toFixed(0)}` : "";
+    lines.push(`• ${title}\n  ${[yesStr, noStr].filter(Boolean).join(" / ")}${volStr}`);
+  }
+  lines.push("\n🔗 nano.blockrun.ai · pay per call via x402 USDC");
+  return lines.join("\n");
+}
+
 /** Extract display text from x402 marketplace HTTP response (no OpenAI). */
 export function extractX402MarketplaceContent(bodyText: string): string {
   const trimmed = bodyText.trim();
@@ -18,6 +42,10 @@ export function extractX402MarketplaceContent(bodyText: string): string {
 
     if (parsed && typeof parsed === "object") {
       const obj = parsed as Record<string, unknown>;
+
+      // Polymarket crypto-updown response (nano.blockrun.ai)
+      const polyFmt = formatPolymarketCryptoUpdown(obj);
+      if (polyFmt) return polyFmt;
 
       // Explicit tweet-thread keys (api.aisa.one + common marketplace formats)
       for (const key of ["tweets", "thread", "items", "posts"]) {

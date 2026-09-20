@@ -31,13 +31,13 @@ export const AGENTS: Agent[] = [
   },
   {
     id: "surf-news",
-    name: "Surf Crypto News",
-    handle: "@surf_ai",
-    category: "News Feed",
+    name: "Polymarket Pulse",
+    handle: "@polymarket_pulse",
+    category: "Prediction Markets",
     price: 0.001,
     description:
-      "AI-curated crypto news feed from Surf (~0.001 USDC/call). Great for fast market headlines.",
-    emoji: "🏄",
+      "Live crypto prediction market odds from Polymarket via nano.blockrun.ai (~0.001 USDC/call). Crypto up/down market sentiment.",
+    emoji: "📊",
     accent: "cyan",
     baseUrl: "https://nano.blockrun.ai",
     network: "base",

@@ -256,14 +256,18 @@ async function resolveGatewayChainForResource(
   privateKey: `0x${string}`,
 ): Promise<GatewayChainKey | null> {
   // Surf / nano.blockrun require GatewayWalletBatched on Polygon — try polygon before base.
-  const order: GatewayChainKey[] = ["polygon", "base", "arcTestnet", "arc"];
+  // "arc" (mainnet) is NOT included: GatewayClient rejects it as unsupported chain.
+  // Arc Mainnet agents bypass this function entirely (chainId === 5042 early return above).
+  const order: GatewayChainKey[] = ["polygon", "base", "arcTestnet"];
   for (const chain of order) {
     for (const rpcUrl of rpcCandidatesForGatewayChain(chain)) {
-      const gateway = new GatewayClient({
-        chain,
-        privateKey,
-        rpcUrl,
-      });
+      let gateway: InstanceType<typeof GatewayClient>;
+      try {
+        gateway = new GatewayClient({ chain, privateKey, rpcUrl });
+      } catch {
+        // chain not supported by this version of x402-batching — skip
+        continue;
+      }
       const support = await gateway.supports(resourceUrl).catch(() => ({
         supported: false as const,
       }));
@@ -742,19 +746,23 @@ export async function payX402Resource(
   }
 
   // Messari and other exact EIP-3009 sellers (not GatewayWalletBatched).
-  const legacyGateway = new GatewayClient({
-    chain: gatewayChainKeyForChainId(chainId),
-    privateKey,
-    rpcUrl: env.BASE_RPC_URL,
-  });
-  const legacySupport = await legacyGateway.supports(resourceUrl).catch(() => ({
-    supported: false as const,
-  }));
-  if (legacySupport.supported) {
+  // Only attempt legacy Gateway for chains the SDK actually supports (base, polygon, arcTestnet).
+  const legacyChainKey = gatewayChainKeyForChainId(chainId);
+  let legacySupport = { supported: false as const };
+  let legacyGateway: InstanceType<typeof GatewayClient> | undefined;
+  if (legacyChainKey !== "arc") {
+    try {
+      legacyGateway = new GatewayClient({ chain: legacyChainKey, privateKey, rpcUrl: env.BASE_RPC_URL });
+      legacySupport = await legacyGateway.supports(resourceUrl).catch(() => ({ supported: false as const }));
+    } catch {
+      // chain not supported by installed x402-batching version
+    }
+  }
+  if (legacySupport.supported && legacyGateway) {
     return payViaGateway(
       legacyGateway,
       privateKey,
-      gatewayChainKeyForChainId(chainId),
+      legacyChainKey,
       resourceUrl,
       minUsdc,
       init,

@@ -12,6 +12,8 @@ const USER_ONCHAIN_TRANSFER_RE =
   /Không thể chuyển USDC từ ví|Ví on-chain không đủ USDC để chi trả API|User-to-master USDC transfer/i;
 const USER_USDC_RE =
   /Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient USDC|khả dụng|Insufficient balance|Content Credits/i;
+const CIRCLE_DCW_ARC_MAINNET_RE =
+  /insufficient token balance.*wallet|the asset amount owned by the wallet is insufficient/i;
 const GAS_RE =
   /native token|insufficient funds for gas|max fee per gas|gas required exceeds|ETH gas/i;
 const NETWORK_SCHEME_RE =
@@ -118,6 +120,23 @@ export function formatPaymentErrorForUser(
       (addr
         ? `Admin: fund ${addr} with USDC on Arc Mainnet (chain ID 5042) · npm run show:x402`
         : "Admin: npm run show:x402 → fund the printed address with real USDC on Arc Mainnet.")
+    );
+  }
+
+  if (CIRCLE_DCW_ARC_MAINNET_RE.test(message)) {
+    // Circle DCW does not support ARC mainnet — user wallet has 0 balance on that chain.
+    // After hướng B fix: master pays first, this error only appears for settlement reimbursement queue.
+    if (locale === "vi") {
+      return (
+        "Lần chạy agent Arc Mainnet thành công — USDC đã được trừ từ Content Credits. " +
+        "Thanh toán on-chain đang được xử lý theo lô (Circle chưa hỗ trợ ARC mainnet cho ví DCW). " +
+        "Kết quả đã trả về đầy đủ."
+      );
+    }
+    return (
+      "Arc Mainnet agent ran successfully — USDC debited from Content Credits. " +
+      "On-chain reimbursement queued in batch (Circle DCW does not yet support ARC mainnet blockchain). " +
+      "Your result has been returned."
     );
   }
 

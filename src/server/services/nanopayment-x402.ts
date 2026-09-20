@@ -277,7 +277,10 @@ export async function processNanopaymentX402(
     debited = true;
     debitedAmount = agentPriceUsdc;
 
-    if (!usesGatewayPolygon) {
+    const isArcMainnetAgent = agentPrefersArcMainnet(agentServiceId);
+
+    if (!usesGatewayPolygon && !isArcMainnetAgent) {
+      // Normal flow: collect user USDC first, then master pays API
       const prefund = await collectUserUsdcForX402({
         clerkId,
         userWalletId,
@@ -289,6 +292,8 @@ export async function processNanopaymentX402(
       userPrefunded = true;
       onChainSettlementQueuedId = prefund.settlementId;
     }
+    // Arc Mainnet agents: master pays API first (Circle DCW does not support ARC mainnet),
+    // user settlement queued post-pay as a batch (same pattern as Gateway Polygon/Surf).
 
     const response = await settleWithMasterAgentBounded(
       resourceUrl,
@@ -312,7 +317,11 @@ export async function processNanopaymentX402(
 
     assertAgentResponseUsable(response.data, bodyText);
 
-    if (usesGatewayPolygon) {
+    if (usesGatewayPolygon || isArcMainnetAgent) {
+      // Post-pay settlement: master already paid API, now queue user→master reimbursement.
+      // Arc Mainnet: Circle DCW does not support ARC blockchain, so we queue via batch settler
+      // which will use EVM signing-only path or retry when Circle adds ARC mainnet support.
+      const settlementLabel = isArcMainnetAgent ? "Arc Mainnet" : "Surf Gateway";
       try {
         const prefund = await collectUserUsdcForX402({
           clerkId,
@@ -325,7 +334,10 @@ export async function processNanopaymentX402(
         onChainSettlementQueuedId = prefund.settlementId;
         userPrefunded = true;
       } catch (transferErr) {
-        console.warn("[x402] Surf post-pay user→x402 transfer failed, queue batch:", transferErr);
+        console.warn(
+          `[x402] ${settlementLabel} post-pay user→x402 transfer failed, queue batch:`,
+          transferErr,
+        );
         onChainSettlementQueuedId = reserveOnchainSettlement({
           ledgerEntryId,
           userId: clerkId,
@@ -337,7 +349,10 @@ export async function processNanopaymentX402(
         try {
           await processSettlementBatchForUser(clerkId);
         } catch (batchErr) {
-          console.warn("[x402] Surf settlement batch failed (retry on Wallet sync):", batchErr);
+          console.warn(
+            `[x402] ${settlementLabel} settlement batch failed (retry on Wallet sync):`,
+            batchErr,
+          );
         }
       }
     }

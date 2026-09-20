@@ -77,7 +77,7 @@ export function unifiedBalanceChainForChainId(chainId: SupportedChainId): string
 
 export function gatewayChainKeyForChainId(
   chainId: SupportedChainId,
-): "base" | "arcTestnet" | "arc" {
+): "base" | "arcTestnet" | "arc" | "polygon" {
   if (chainId === BASE_CHAIN_ID) return "base";
   if (chainId === ARC_MAINNET_CHAIN_ID) return "arc";
   return "arcTestnet";

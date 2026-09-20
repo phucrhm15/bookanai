@@ -3,14 +3,23 @@
  * - Circle Gateway batching (AIsa / Discovery sellers)
  * - Standard EIP-3009 exact (Messari and other non-Gateway sellers)
  */
-import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, parseUnits } from "viem";
+import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, parseUnits, defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, polygon } from "viem/chains";
+
+// Arc Mainnet chain definition for viem // arc-studio-allow-onchain-literal
+const arcMainnet = defineChain({
+  id: 5042,
+  name: "Arc",
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.network"] } }, // arc-studio-allow-onchain-literal
+});
 import { x402Client } from "@x402/core/client";
 import { x402HTTPClient } from "@x402/core/http";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { GatewayClient } from "@circle-fin/x402-batching/client";
 import {
+  ARC_MAINNET_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
   POLYGON_USDC_CONTRACT_ADDRESS,
   gatewayChainKeyForChainId,
@@ -71,6 +80,8 @@ function polygonRpcCandidates(): string[] {
 function rpcUrlForChain(chainId: number): string | undefined {
   if (chainId === 8453) return rpcUrlCandidates()[0];
   if (chainId === 137) return polygonRpcCandidates()[0];
+  if (chainId === 5042) return arcMainnetRpcCandidates()[0];
+  if (chainId === 5042002) return getServerEnv().ARC_RPC_URL;
   return undefined;
 }
 
@@ -85,23 +96,33 @@ function requirePolygonRpc(): string {
   return url;
 }
 
-type GatewayChainKey = "base" | "polygon" | "arcTestnet";
+type GatewayChainKey = "base" | "polygon" | "arcTestnet" | "arc";
+
+function arcMainnetRpcCandidates(): string[] {
+  return sanitizeRpcUrls([
+    getServerEnv().ARC_MAINNET_RPC_URL,
+    "https://rpc.mainnet.arc.network", // arc-studio-allow-onchain-literal
+  ]);
+}
 
 function rpcCandidatesForGatewayChain(chain: GatewayChainKey): string[] {
   if (chain === "polygon") return polygonRpcCandidates();
   if (chain === "base") return rpcUrlCandidates();
+  if (chain === "arc") return arcMainnetRpcCandidates();
   return [getServerEnv().ARC_RPC_URL];
 }
 
 function rpcUrlForGatewayChain(chain: GatewayChainKey): string {
   if (chain === "polygon") return requirePolygonRpc();
   if (chain === "base") return rpcUrlCandidates()[0] ?? getServerEnv().BASE_RPC_URL;
+  if (chain === "arc") return arcMainnetRpcCandidates()[0] ?? getServerEnv().ARC_MAINNET_RPC_URL;
   return getServerEnv().ARC_RPC_URL;
 }
 
 function expectedNetworkForGatewayChain(chain: GatewayChainKey): string {
   if (chain === "polygon") return "eip155:137";
   if (chain === "base") return "eip155:8453";
+  if (chain === "arc") return "eip155:5042";
   return "eip155:5042002";
 }
 
@@ -161,6 +182,31 @@ async function ensureMasterWalletUsdcOnBase(minUsdc: number): Promise<void> {
   }
 }
 
+async function readMasterArcMainnetWalletUsdc(): Promise<number> {
+  const depositor = masterDepositorAddress();
+  const rpcUrl = arcMainnetRpcCandidates()[0] ?? getServerEnv().ARC_MAINNET_RPC_URL;
+  const client = createPublicClient({ chain: arcMainnet, transport: http(rpcUrl) });
+  const raw = await client.readContract({
+    address: ARC_MAINNET_USDC_CONTRACT_ADDRESS,
+    abi: erc20BalanceAbi,
+    functionName: "balanceOf",
+    args: [depositor],
+  });
+  return Number.parseFloat(formatUnits(raw, 6));
+}
+
+async function ensureMasterWalletUsdcOnArcMainnet(minUsdc: number): Promise<void> {
+  const walletUsdc = await readMasterArcMainnetWalletUsdc();
+  if (walletUsdc + 1e-9 < minUsdc) {
+    const depositor = masterDepositorAddress();
+    throw new CircleServiceError(
+      `Ví master thiếu USDC on-chain trên Arc Mainnet (${walletUsdc.toFixed(6)} < ${minUsdc} USDC) cho x402 exact. ` +
+        `Nạp USDC trực tiếp vào ${depositor} trên Arc Mainnet (chain 5042).`,
+      "INSUFFICIENT_BALANCE",
+    );
+  }
+}
+
 /** x402 EOA that pays Circle Agent APIs (on-chain Base USDC, not Gateway deposit). */
 export function getMasterX402DepositorAddress(): `0x${string}` {
   return masterDepositorAddress();
@@ -210,7 +256,7 @@ async function resolveGatewayChainForResource(
   privateKey: `0x${string}`,
 ): Promise<GatewayChainKey | null> {
   // Surf / nano.blockrun require GatewayWalletBatched on Polygon — try polygon before base.
-  const order: GatewayChainKey[] = ["polygon", "base", "arcTestnet"];
+  const order: GatewayChainKey[] = ["polygon", "base", "arcTestnet", "arc"];
   for (const chain of order) {
     for (const rpcUrl of rpcCandidatesForGatewayChain(chain)) {
       const gateway = new GatewayClient({
@@ -558,6 +604,8 @@ async function payViaExactEvm(
 ): Promise<X402PayResult> {
   if (chainId === 8453) {
     await ensureMasterWalletUsdcOnBase(minUsdc);
+  } else if (chainId === 5042) {
+    await ensureMasterWalletUsdcOnArcMainnet(minUsdc);
   }
 
   const env = getServerEnv();
@@ -589,7 +637,9 @@ async function payViaExactEvm(
     const requiredChainIds = accepts
       .map((a) => chainIdFromEip155(a.network))
       .filter((id): id is number => Number.isFinite(id));
-    const candidateChains = Array.from(new Set([chainId, ...requiredChainIds, 8453, 137]));
+    // For Arc Mainnet agents: do NOT add Base (8453) as a fallback — x402 must settle on Arc.
+    const extraFallbacks = chainId === 5042 ? [] : [8453, 137];
+    const candidateChains = Array.from(new Set([chainId, ...requiredChainIds, ...extraFallbacks]));
     const schemeOptions: Record<number, { rpcUrl: string }> = {};
     for (const c of candidateChains) {
       const rpcUrl = rpcUrlForChain(c);

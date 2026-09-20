@@ -10,7 +10,9 @@ const envSchema = z.object({
   BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
   /** Polygon mainnet — Surf x402 Gateway (do not use polygon-rpc.com without a paid key) */
   POLYGON_RPC_URL: z.string().url().default("https://polygon.llamarpc.com"),
-  ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
+  ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"), // arc-studio-allow-onchain-literal
+  /** Arc Mainnet — real USDC, chain 5042 */
+  ARC_MAINNET_RPC_URL: z.string().url().default("https://rpc.mainnet.arc.network"), // arc-studio-allow-onchain-literal
   BASE_CHAIN_ID: z.coerce.number().default(8453),
   ARC_CHAIN_ID: z.coerce.number().default(5042002),
   USDC_CONTRACT_ADDRESS: z

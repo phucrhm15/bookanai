@@ -57,7 +57,9 @@ export const en = {
     toastActiveDesc: "{{price}} USDC per request",
     sectionBase: "Base · mainnet x402",
     sectionArc: "Arc Testnet · USDC gas",
+    sectionArcMainnet: "Arc Mainnet · real USDC",
     badgeArc: "Arc Testnet",
+    badgeArcMainnet: "Arc Mainnet",
     badgeBase: "Base",
   },
   agents: {

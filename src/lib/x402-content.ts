@@ -8,17 +8,45 @@ export function extractX402MarketplaceContent(bodyText: string): string {
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (typeof parsed === "string") return parsed;
+
+    // Array at root = tweet thread
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+        .join("\n\n");
+    }
+
     if (parsed && typeof parsed === "object") {
       const obj = parsed as Record<string, unknown>;
-      for (const key of ["content", "text", "message", "result", "output"]) {
+
+      // Explicit tweet-thread keys (api.aisa.one + common marketplace formats)
+      for (const key of ["tweets", "thread", "items", "posts"]) {
+        const val = obj[key];
+        if (Array.isArray(val) && val.length > 0) {
+          return val
+            .map((item) => (typeof item === "string" ? item : (item as Record<string, unknown>).text ?? JSON.stringify(item)))
+            .join("\n\n");
+        }
+      }
+
+      // Plain string fields
+      for (const key of ["content", "text", "message", "result", "output", "summary", "answer"]) {
         const val = obj[key];
         if (typeof val === "string" && val.trim()) return val.trim();
       }
+
+      // Nested data object
       if (obj.data !== undefined) {
-        return typeof obj.data === "string"
-          ? obj.data
-          : JSON.stringify(obj.data, null, 2);
+        if (typeof obj.data === "string") return obj.data;
+        if (Array.isArray(obj.data)) {
+          return (obj.data as unknown[])
+            .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+            .join("\n\n");
+        }
+        return JSON.stringify(obj.data, null, 2);
       }
+
+      // Last resort: pretty-print JSON so the user sees the raw payload
       return JSON.stringify(parsed, null, 2);
     }
   } catch {

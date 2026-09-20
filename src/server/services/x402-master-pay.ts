@@ -702,6 +702,11 @@ export async function payX402Resource(
   const env = getServerEnv();
   const privateKey = env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`;
 
+  // Arc Mainnet agents use Exact EVM only — skip Gateway discovery to avoid ~1s probe delay.
+  if (chainId === 5042) {
+    return payViaExactEvm(resourceUrl, chainId, minUsdc, init);
+  }
+
   const gatewayChain = await resolveGatewayChainForResource(resourceUrl, privateKey);
   if (gatewayChain) {
     let lastGatewayError: unknown;

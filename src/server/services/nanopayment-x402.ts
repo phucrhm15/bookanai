@@ -27,6 +27,7 @@ import {
   resolveAgentResource,
   STUDIO_AGENT_FALLBACK_PRICE_USDC,
   agentUsesGatewayPolygonPay,
+  agentPrefersArcMainnet,
 } from "@/services/agent-service-map";
 import {
   assertMasterGatewayPolygonUsdc,

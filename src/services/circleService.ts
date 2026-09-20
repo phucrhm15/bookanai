@@ -2,12 +2,16 @@ import { randomUUID } from "node:crypto";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
 import {
   ARC_USDC_CONTRACT_ADDRESS,
+  ARC_MAINNET_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
   ARC_NETWORK,
+  ARC_MAINNET_NETWORK,
   BASE_NETWORK,
   DCW_BLOCKCHAIN_ARC,
+  DCW_BLOCKCHAIN_ARC_MAINNET,
   DCW_BLOCKCHAIN_BASE,
   UB_CHAIN_ARC,
+  UB_CHAIN_ARC_MAINNET,
   UB_CHAIN_BASE,
   isSupportedChainId,
   type SupportedChainId,
@@ -71,7 +75,11 @@ async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalan
   const client = getDcwClient();
   const response = await client.getWalletTokenBalance({
     id: walletId,
-    tokenAddresses: [BASE_USDC_CONTRACT_ADDRESS, ARC_USDC_CONTRACT_ADDRESS],
+    tokenAddresses: [
+      BASE_USDC_CONTRACT_ADDRESS,
+      ARC_USDC_CONTRACT_ADDRESS,
+      ARC_MAINNET_USDC_CONTRACT_ADDRESS,
+    ],
   });
 
   const tokens = response.data?.tokenBalances ?? [];
@@ -95,6 +103,12 @@ async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalan
     ) {
       byChain.set(ARC_NETWORK.id, (byChain.get(ARC_NETWORK.id) ?? 0) + amount);
     }
+    if (
+      blockchain === DCW_BLOCKCHAIN_ARC_MAINNET &&
+      address === ARC_MAINNET_USDC_CONTRACT_ADDRESS.toLowerCase()
+    ) {
+      byChain.set(ARC_MAINNET_NETWORK.id, (byChain.get(ARC_MAINNET_NETWORK.id) ?? 0) + amount);
+    }
   }
 
   const breakdown: ChainBalanceBreakdown[] = [];
@@ -115,6 +129,15 @@ async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalan
     breakdown.push({
       chain: UB_CHAIN_ARC,
       chainId: ARC_NETWORK.id,
+      confirmedBalance: amt.toFixed(6),
+    });
+  }
+  if (byChain.has(ARC_MAINNET_NETWORK.id)) {
+    const amt = byChain.get(ARC_MAINNET_NETWORK.id)!;
+    total += amt;
+    breakdown.push({
+      chain: UB_CHAIN_ARC_MAINNET,
+      chainId: ARC_MAINNET_NETWORK.id,
       confirmedBalance: amt.toFixed(6),
     });
   }

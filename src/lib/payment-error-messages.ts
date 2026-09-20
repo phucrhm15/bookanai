@@ -5,7 +5,9 @@ import { buildUniswapArcSwapUrl } from "@/lib/arc-testnet-ecosystem";
 const MASTER_GATEWAY_USDC_RE =
   /Circle Gateway thiếu USDC|Gateway thiếu USDC/i;
 const MASTER_ONCHAIN_BASE_RE =
-  /thiếu USDC on-chain trên Base|USDC on-chain on Base|x402 exact|khác với npm run gateway:deposit/i;
+  /thiếu USDC on-chain trên Base|USDC on-chain on Base|x402 exact \(Web Search\)|khác với npm run gateway:deposit/i;
+const MASTER_ONCHAIN_ARC_MAINNET_RE =
+  /thiếu USDC on-chain trên Arc Mainnet|USDC on-chain trên Arc Mainnet|x402 exact\. Nạp USDC trực tiếp vào.*trên Arc Mainnet/i;
 const USER_ONCHAIN_TRANSFER_RE =
   /Không thể chuyển USDC từ ví|Ví on-chain không đủ USDC để chi trả API|User-to-master USDC transfer/i;
 const USER_USDC_RE =
@@ -99,8 +101,48 @@ export function formatPaymentErrorForUser(
     );
   }
 
+  if (MASTER_ONCHAIN_ARC_MAINNET_RE.test(message)) {
+    const addr = extractAddress(message);
+    if (locale === "vi") {
+      return (
+        "Ví master server thiếu USDC on-chain trên Arc Mainnet (chain 5042) để thanh toán agent Arc Mainnet. " +
+        "Đây là USDC thật — không phải Content Credits của bạn. " +
+        (addr
+          ? `Admin: nạp USDC vào ${addr} trên Arc Mainnet (chain ID 5042) · npm run show:x402`
+          : "Admin: npm run show:x402 → nạp USDC thật trên Arc Mainnet vào địa chỉ in ra.")
+      );
+    }
+    return (
+      "The server master wallet lacks on-chain USDC on Arc Mainnet (chain 5042) to pay Arc Mainnet agents. " +
+      "These are real funds — not your Content Credits. " +
+      (addr
+        ? `Admin: fund ${addr} with USDC on Arc Mainnet (chain ID 5042) · npm run show:x402`
+        : "Admin: npm run show:x402 → fund the printed address with real USDC on Arc Mainnet.")
+    );
+  }
+
   if (GAS_RE.test(message)) {
     const addr = extractAddress(message);
+    // Detect Arc Mainnet context from message (chain 5042 agents don't use ETH gas — USDC is native)
+    const isArcMainnetCtx = /Arc Mainnet|chain 5042[^0]|arc mainnet/i.test(message);
+    if (isArcMainnetCtx) {
+      if (locale === "vi") {
+        return (
+          "Lỗi gas trên Arc Mainnet cho ví x402 server. Trên Arc, USDC là native gas — " +
+          "ví master cần USDC trên Arc Mainnet (chain 5042), không cần ETH. " +
+          (addr
+            ? `Admin: nạp USDC vào ${addr} trên Arc Mainnet · npm run show:x402`
+            : "Admin: npm run show:x402 → nạp USDC Arc Mainnet.")
+        );
+      }
+      return (
+        "Gas error on Arc Mainnet for the server x402 wallet. On Arc, USDC is native gas — " +
+        "the master wallet needs USDC on Arc Mainnet (chain 5042), not ETH. " +
+        (addr
+          ? `Admin: fund ${addr} with USDC on Arc Mainnet · npm run show:x402`
+          : "Admin: npm run show:x402 → fund with USDC on Arc Mainnet.")
+      );
+    }
     if (locale === "vi") {
       return (
         "Thiếu ETH gas trên Base cho ví x402 của server (MASTER_AGENT_PRIVATE_KEY), " +

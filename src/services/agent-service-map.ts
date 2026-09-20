@@ -51,10 +51,12 @@ export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> =
 /** Surf pays via Circle GatewayWalletBatched on Polygon — not Base exact x402. */
 export const GATEWAY_POLYGON_AGENT_IDS = new Set(["surf-news"]);
 
-/** Re-export Arc Testnet agent gateway — register agent ids when they ship on Arc x402. */
+/** Re-export Arc agent gateways */
 export {
   ARC_TESTNET_AGENT_IDS,
+  ARC_MAINNET_AGENT_IDS,
   agentPrefersArcTestnet,
+  agentPrefersArcMainnet,
   agentAcceptsArcTestnet,
   resolveAgentPaymentChain,
   arcTestnetGatewayReady,

@@ -13,7 +13,7 @@ export const ARC_WALLET_CHAIN_PARAMS = {
     symbol: "USDC",
     decimals: 18,
   },
-  rpcUrls: ["https://rpc.testnet.arc.network"],
+  rpcUrls: ["https://rpc.testnet.arc.io"],
   blockExplorerUrls: ["https://testnet.arcscan.app"],
 } as const;
 
@@ -95,7 +95,7 @@ export const ARC_ECOSYSTEM_TOOLS: ArcEcosystemTool[] = [
 
 export const ARC_NETWORK_FACTS = {
   chainId: ARC_CHAIN_ID,
-  rpcUrl: "https://rpc.testnet.arc.network",
+  rpcUrl: "https://rpc.testnet.arc.io",
   explorerUrl: "https://testnet.arcscan.app",
   usdcContract: ARC_USDC_CONTRACT_ADDRESS,
   eurcContract: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a",

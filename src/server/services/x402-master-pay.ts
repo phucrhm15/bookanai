@@ -12,7 +12,7 @@ const arcMainnet = defineChain({
   id: 5042,
   name: "Arc",
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.network"] } }, // arc-studio-allow-onchain-literal
+  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.io"] } }, // arc-studio-allow-onchain-literal
 });
 import { x402Client } from "@x402/core/client";
 import { x402HTTPClient } from "@x402/core/http";
@@ -101,7 +101,7 @@ type GatewayChainKey = "base" | "polygon" | "arcTestnet" | "arc";
 function arcMainnetRpcCandidates(): string[] {
   return sanitizeRpcUrls([
     getServerEnv().ARC_MAINNET_RPC_URL,
-    "https://rpc.mainnet.arc.network", // arc-studio-allow-onchain-literal
+    "https://rpc.mainnet.arc.io", // arc-studio-allow-onchain-literal
   ]);
 }
 

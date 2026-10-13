@@ -74,7 +74,9 @@ export function formatPaymentErrorForUser(
     );
   }
 
-  if (MASTER_GATEWAY_USDC_RE.test(message) || /Master wallet|Ví Master thiếu USDC|Gateway Polygon unavailable|Surf cần USDC trong Gateway/i.test(message)) {
+  // Do not match Surf/Gateway message for Arc Mainnet errors
+  const isArcMainnetErr = /Arc Mainnet|chain 5042[^0]|eip155:5042[^0]/i.test(message);
+  if (!isArcMainnetErr && (MASTER_GATEWAY_USDC_RE.test(message) || /Master wallet|Ví Master thiếu USDC|Gateway Polygon unavailable|Surf cần USDC trong Gateway/i.test(message))) {
     const addr = extractAddress(message);
     const needsPolygon = POLYGON_CONTEXT_RE.test(message);
     if (locale === "vi") {

@@ -278,6 +278,9 @@ export async function processNanopaymentX402(
     debitedAmount = agentPriceUsdc;
 
     const isArcMainnetAgent = agentPrefersArcMainnet(agentServiceId);
+    console.info(
+      `[x402] payment routing: agentId=${agentServiceId} chainId=${paymentChainId} isArcMainnet=${isArcMainnetAgent} usesGatewayPolygon=${usesGatewayPolygon}`,
+    );
 
     if (!usesGatewayPolygon && !isArcMainnetAgent) {
       // Normal flow: collect user USDC first, then master pays API

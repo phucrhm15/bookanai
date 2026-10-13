@@ -1,12 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@clerk/tanstack-react-start";
-import { ArrowRight, Sparkles, Store, Wallet, Zap } from "lucide-react";
+import { ArrowRight, Sparkles, Store, Wallet, Zap, Layers } from "lucide-react";
 import { getLocalizedAgents } from "@/lib/agents-localized";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AuthControls } from "@/components/auth-controls";
+import { cn } from "@/lib/utils";
 
 export function Landing() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -26,7 +27,7 @@ export function Landing() {
                 NANO<span className="text-gradient-neon">.AGENT</span>
               </div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                x402 · USDC on Base
+                x402 · Base + Arc Mainnet
               </div>
             </div>
           </Link>
@@ -97,7 +98,7 @@ export function Landing() {
         </section>
 
         <section className="border-y border-border/60 bg-card/30 py-16">
-          <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-3 md:px-6">
+          <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-2 lg:grid-cols-4 md:px-6">
             <Feature
               icon={Store}
               title={t("landing.featureMarketplaceTitle")}
@@ -113,6 +114,12 @@ export function Landing() {
               title={t("landing.featureWalletTitle")}
               text={t("landing.featureWalletText")}
             />
+            <Feature
+              icon={Layers}
+              title={t("landing.featureArcTitle")}
+              text={t("landing.featureArcText")}
+              highlight
+            />
           </div>
         </section>
 
@@ -120,26 +127,47 @@ export function Landing() {
           <h2 className="font-display text-2xl font-bold">{t("landing.agentsTitle")}</h2>
           <p className="mt-2 text-sm text-muted-foreground">{t("landing.agentsHint")}</p>
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {agents.map((agent) => (
-              <article
-                key={agent.id}
-                className="rounded-xl border border-border/60 bg-gradient-panel p-5 transition-colors hover:border-primary/40"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl">{agent.emoji}</span>
-                  <div>
-                    <h3 className="font-semibold">{agent.name}</h3>
-                    <p className="font-mono text-[10px] uppercase text-muted-foreground">
-                      {agent.handle}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">{agent.description}</p>
-                    <p className="mt-3 font-mono text-xs text-primary">
-                      ~{agent.price} {t("landing.perRequest")}
-                    </p>
+            {agents.map((agent) => {
+              const isArcMainnet = agent.network === "arc";
+              const isArcTestnet = agent.network === "arc-testnet";
+              return (
+                <article
+                  key={agent.id}
+                  className={cn(
+                    "rounded-xl border bg-gradient-panel p-5 transition-colors",
+                    isArcMainnet
+                      ? "border-yellow-400/30 hover:border-yellow-400/50"
+                      : "border-border/60 hover:border-primary/40",
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-3xl">{agent.emoji}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-semibold">{agent.name}</h3>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0 font-mono text-[9px] uppercase tracking-wider",
+                            isArcMainnet && "border-yellow-400/40 bg-yellow-400/10 text-yellow-300",
+                            isArcTestnet && "border-lime-400/40 bg-lime-400/10 text-lime-300",
+                          )}
+                        >
+                          {isArcMainnet ? t("marketplace.badgeArcMainnet") : isArcTestnet ? t("marketplace.badgeArc") : t("marketplace.badgeBase")}
+                        </Badge>
+                      </div>
+                      <p className="font-mono text-[10px] uppercase text-muted-foreground">
+                        {agent.handle}
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">{agent.description}</p>
+                      <p className={cn("mt-3 font-mono text-xs", isArcMainnet ? "text-yellow-400" : "text-primary")}>
+                        ~{agent.price} {t("landing.perRequest")}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
           <div className="mt-10 text-center">
             {isLoaded && !isSignedIn ? (
@@ -165,14 +193,22 @@ function Feature({
   icon: Icon,
   title,
   text,
+  highlight,
 }: {
   icon: typeof Store;
   title: string;
   text: string;
+  highlight?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-background/60 p-5">
-      <Icon className="mb-3 h-8 w-8 text-primary" />
+    <div
+      className={
+        highlight
+          ? "rounded-xl border border-yellow-400/40 bg-yellow-400/5 p-5 shadow-[0_0_18px_rgba(251,191,36,0.08)]"
+          : "rounded-xl border border-border/60 bg-background/60 p-5"
+      }
+    >
+      <Icon className={`mb-3 h-8 w-8 ${highlight ? "text-yellow-400" : "text-primary"}`} />
       <h3 className="font-semibold">{title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{text}</p>
     </div>

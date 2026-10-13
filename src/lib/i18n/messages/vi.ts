@@ -15,12 +15,12 @@ export const vi: typeof en = {
     activeAgent: "Agent đang chọn:",
   },
   landing: {
-    badge: "Circle x402 · Trả theo lần gọi API",
+    badge: "Circle x402 · Trả theo lần gọi API · Arc Mainnet",
     heroTitle: "API data & search →",
     heroTitleAccent: "thread X",
     heroTitleSuffix: ", trả bằng USDC",
     heroBody:
-      "Đăng ký, nạp USDC vào ví embedded (Base), chọn Surf hoặc Web Search, nhận nội dung định dạng sẵn cho X — không cần API key riêng.",
+      "Đăng ký, nạp ví, chọn agent — trả mỗi lần gọi bằng USDC trên Base hoặc Arc Mainnet. Không cần API key, không subscription.",
     ctaSignUp: "Tạo tài khoản",
     ctaSignIn: "Đăng nhập",
     ctaHasAccount: "Đã có tài khoản",
@@ -29,15 +29,22 @@ export const vi: typeof en = {
     ctaTopUp: "Nạp USDC",
     ctaTry: "Dùng thử ngay",
     featureMarketplaceTitle: "Marketplace",
-    featureMarketplaceText: "Chọn agent data hoặc search; giá USDC từ x402 (HTTP 402).",
+    featureMarketplaceText:
+      "5 agents trên Base, Arc Testnet và Arc Mainnet — giá USDC được đặt trực tiếp bởi x402 (HTTP 402).",
     featureStudioTitle: "Studio",
-    featureStudioText: "Nhập prompt, thanh toán micropayment, xem preview thread X.",
+    featureStudioText:
+      "Nhập prompt, thanh toán qua x402 nanopayment, nhận kết quả định dạng sẵn thành thread X.",
     featureWalletTitle: "Ví USDC",
-    featureWalletText: "Circle programmable wallet — nạp USDC Base, theo dõi Content Credits.",
+    featureWalletText:
+      "Circle programmable wallet — nạp USDC trên Base hoặc Arc Mainnet, theo dõi Content Credits.",
+    featureArcTitle: "Arc Mainnet",
+    featureArcText:
+      "3 agents chạy trên Arc Mainnet (chain 5042) — USDC là native gas, finality dưới 1 giây, thanh toán on-chain thật.",
     agentsTitle: "Agents có sẵn",
     agentsHint: "Giá hiển thị là gợi ý — số tiền thực tế do API x402 quyết định khi chạy.",
     perRequest: "USDC / lần gọi",
-    footer: "Powered by Circle Programmable Wallets · x402 · Clerk Auth",
+    footer:
+      "Powered by Circle Programmable Wallets · x402 · Arc Mainnet · Clerk Auth",
     signIn: "Đăng nhập",
     signUpFree: "Bắt đầu miễn phí",
   },
@@ -47,7 +54,7 @@ export const vi: typeof en = {
     title: "x402",
     titleAccent: "Data Agents",
     subtitle:
-      "API x402 thật — agent Base mainnet + nhóm Arc Testnet (gas bằng USDC).",
+      "API x402 thật — agent Base, Arc Testnet và Arc Mainnet. Trả theo lần gọi bằng USDC.",
     searchPlaceholder: "Tìm agent…",
     agentsCount: "{{count}} / {{total}} agents",
     usdcPerRequest: "USDC / lần",

@@ -13,12 +13,12 @@ export const en = {
     activeAgent: "Active agent:",
   },
   landing: {
-    badge: "Circle x402 · Pay per API call",
+    badge: "Circle x402 · Pay per API call · Arc Mainnet",
     heroTitle: "Data & search APIs →",
     heroTitleAccent: "X threads",
     heroTitleSuffix: ", paid in USDC",
     heroBody:
-      "Sign up, fund your embedded wallet (Base), pick Surf or Web Search, get content formatted for X — no separate API keys.",
+      "Sign up, fund your wallet, pick an agent — pay per call with USDC on Base or Arc Mainnet. No API keys, no subscriptions.",
     ctaSignUp: "Create account",
     ctaSignIn: "Sign in",
     ctaHasAccount: "Already have an account",
@@ -27,15 +27,22 @@ export const en = {
     ctaTopUp: "Add USDC",
     ctaTry: "Try it now",
     featureMarketplaceTitle: "Marketplace",
-    featureMarketplaceText: "Pick data or search agents; USDC price comes from x402 (HTTP 402).",
+    featureMarketplaceText:
+      "5 agents across Base, Arc Testnet, and Arc Mainnet — USDC price set live by x402 (HTTP 402).",
     featureStudioTitle: "Studio",
-    featureStudioText: "Enter a prompt, pay via micropayment, preview your X thread.",
+    featureStudioText:
+      "Enter a prompt, pay via x402 nanopayment, get your result formatted as an X thread.",
     featureWalletTitle: "USDC wallet",
-    featureWalletText: "Circle programmable wallet — deposit Base USDC, track Content Credits.",
+    featureWalletText:
+      "Circle programmable wallet — deposit USDC on Base or Arc Mainnet, track Content Credits.",
+    featureArcTitle: "Arc Mainnet",
+    featureArcText:
+      "3 agents running on Arc Mainnet (chain 5042) — USDC is native gas, sub-second finality, real on-chain payments.",
     agentsTitle: "Available agents",
     agentsHint: "Prices shown are estimates — actual x402 price is set when you run.",
     perRequest: "USDC / call",
-    footer: "Powered by Circle Programmable Wallets · x402 · Clerk Auth",
+    footer:
+      "Powered by Circle Programmable Wallets · x402 · Arc Mainnet · Clerk Auth",
     signIn: "Sign in",
     signUpFree: "Get started free",
   },

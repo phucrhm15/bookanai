@@ -608,9 +608,9 @@ async function payViaExactEvm(
 ): Promise<X402PayResult> {
   if (chainId === 8453) {
     await ensureMasterWalletUsdcOnBase(minUsdc);
-  } else if (chainId === 5042) {
-    await ensureMasterWalletUsdcOnArcMainnet(minUsdc);
   }
+  // Arc Mainnet (5042): skip preflight balance check — Arc RPC may be unavailable from
+  // this server; if master truly lacks USDC the x402 transaction will fail naturally.
 
   const env = getServerEnv();
   const account = privateKeyToAccount(env.MASTER_AGENT_PRIVATE_KEY as `0x${string}`);

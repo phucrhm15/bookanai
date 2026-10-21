@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";
+import { createPublicClient, defineChain, formatUnits, http, parseAbi } from "viem";
 import {
   ARC_USDC_CONTRACT_ADDRESS,
   ARC_MAINNET_USDC_CONTRACT_ADDRESS,
@@ -30,6 +31,7 @@ import type { ChainBalanceBreakdown, UnifiedBalanceSnapshot } from "@/lib/wallet
 export type { ChainBalanceBreakdown, UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
 const PAYMENT_MAX_RETRIES = 2;
+const arcUsdcBalanceAbi = parseAbi(["function balanceOf(address account) view returns (uint256)"]);
 
 export { executeUserToMasterTransfer } from "@/server/services/usdc-transfer";
 
@@ -73,6 +75,25 @@ function emptyOnChainBalance(): UnifiedBalanceSnapshot {
   };
 }
 
+/** Read Arc Mainnet's canonical USDC balance directly from chain 5042. */
+async function fetchArcMainnetUsdc(address: string): Promise<number> {
+  const env = getServerEnv();
+  const chain = defineChain({
+    id: ARC_MAINNET_NETWORK.id,
+    name: "Arc",
+    nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+    rpcUrls: { default: { http: [env.ARC_MAINNET_RPC_URL] } },
+  });
+  const client = createPublicClient({ chain, transport: http(env.ARC_MAINNET_RPC_URL) });
+  const raw = await client.readContract({
+    address: ARC_MAINNET_USDC_CONTRACT_ADDRESS,
+    abi: arcUsdcBalanceAbi,
+    functionName: "balanceOf",
+    args: [address as `0x${string}`],
+  });
+  return Number.parseFloat(formatUnits(raw, 6));
+}
+
 /** On-chain USDC per chain via Developer-Controlled Wallets. */
 async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalanceSnapshot> {
   const client = getDcwClient();
@@ -82,22 +103,16 @@ async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalan
   const primaryTokenAddress = isLiveCircleApiKey(env.CIRCLE_API_KEY)
     ? BASE_USDC_CONTRACT_ADDRESS
     : ARC_USDC_CONTRACT_ADDRESS;
-  const balanceRequests = [
+  const [primaryResponse, arcMainnetUsdc] = await Promise.all([
     client.getWalletTokenBalance({
       id: user.circleWalletId,
       tokenAddresses: [primaryTokenAddress],
     }),
-  ];
-  if (user.arcMainnetWalletId) {
-    balanceRequests.push(
-      client.getWalletTokenBalance({
-        id: user.arcMainnetWalletId,
-        tokenAddresses: [ARC_MAINNET_USDC_CONTRACT_ADDRESS],
-      }),
-    );
-  }
-  const responses = await Promise.all(balanceRequests);
-  const tokens = responses.flatMap((response) => response.data?.tokenBalances ?? []);
+    user.arcMainnetAddress
+      ? fetchArcMainnetUsdc(user.arcMainnetAddress)
+      : Promise.resolve(null),
+  ]);
+  const tokens = primaryResponse.data?.tokenBalances ?? [];
   const byChain = new Map<SupportedChainId, number>();
 
   for (const row of tokens) {
@@ -124,6 +139,10 @@ async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalan
     ) {
       byChain.set(ARC_MAINNET_NETWORK.id, (byChain.get(ARC_MAINNET_NETWORK.id) ?? 0) + amount);
     }
+  }
+
+  if (arcMainnetUsdc !== null) {
+    byChain.set(ARC_MAINNET_NETWORK.id, arcMainnetUsdc);
   }
 
   const breakdown: ChainBalanceBreakdown[] = [];

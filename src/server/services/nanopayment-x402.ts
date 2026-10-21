@@ -15,7 +15,7 @@ import {
   isSupportedChainId,
   type SupportedChainId,
 } from "@/lib/chains";
-import { dcwBlockchainsForApiKey } from "@/lib/circle-dcw-blockchains";
+import { dcwBlockchainsForApiKey, isLiveCircleApiKey } from "@/lib/circle-dcw-blockchains";
 import { resolveAgentPaymentChain, arcTestnetGatewayReady } from "@/lib/arc-agent-network";
 import { buildArcNanopaymentMemo, isArcChain } from "@/lib/arc-transaction-extensions";
 import { probeX402ResourcePrice } from "@/lib/x402-probe";
@@ -134,7 +134,19 @@ export async function processNanopaymentX402(
   }
 
   await ensureClerkUserWalletSynced(clerkId);
-  userStore.requireByClerkId(clerkId);
+  const syncedUser = userStore.requireByClerkId(clerkId);
+  if (!isLiveCircleApiKey((await import("@/server/config/env")).getServerEnv().CIRCLE_API_KEY)) {
+    throw new CircleServiceError(
+      "Arc Research uses Arc Mainnet (chain 5042). Configure a Circle LIVE API key and a mainnet wallet set; TEST keys only provision Arc Testnet wallets. No payment was sent.",
+      "UNSUPPORTED_CHAIN",
+    );
+  }
+  if (!syncedUser.arcMainnetWalletId) {
+    throw new CircleServiceError(
+      "Circle Arc Mainnet wallet is not provisioned for this account. Reload Wallet to create it, then retry. No payment was sent.",
+      "UNSUPPORTED_CHAIN",
+    );
+  }
 
   const { resourceUrl: mappedUrl, discoveryItem } = await resolveAgentResource(agentServiceId);
   const circleApiKey = (await import("@/server/config/env")).getServerEnv().CIRCLE_API_KEY;
@@ -200,16 +212,11 @@ export async function processNanopaymentX402(
   const spendable = Math.min(credits.ledgerBalance, Math.max(0, chainBalance - chainHoldUsdc));
 
   if (spendable < agentPriceUsdc) {
-    const arcHint = agentUsesGatewayPolygonPay(agentServiceId)
-      ? ""
-      : agentServiceId.startsWith("arc-")
-        ? " Agent Arc: KEY TEST dùng faucet Arc USDC; KEY LIVE settle trên Base."
-        : "";
     throw new CircleServiceError(
       `${INSUFFICIENT_MSG}. Cần ${agentPriceUsdc} USDC, khả dụng ${spendable.toFixed(6)} USDC ` +
         `(ledger ${credits.ledgerBalance.toFixed(6)}, USDC chain ${paymentChainId} ${chainBalance.toFixed(6)}, ` +
         `đang giữ trên chain này ${chainHoldUsdc.toFixed(6)}). ` +
-        `Nạp USDC trên chain ${paymentChainId} vào ví Content Credits hoặc mở Wallet để đồng bộ.${arcHint}`,
+        `Nạp USDC Arc Mainnet (chain 5042) vào địa chỉ ${walletRow.address}. Số dư trên Base hoặc Arc Testnet không dùng được cho lần gọi này.`,
       "INSUFFICIENT_BALANCE",
     );
   }
@@ -296,7 +303,7 @@ export async function processNanopaymentX402(
       try {
         const prefund = await collectUserUsdcForX402({
           clerkId,
-          userWalletId,
+          userWalletId: syncedUser.arcMainnetWalletId,
           ledgerEntryId,
           amountUsdc: agentPriceUsdc,
           targetChainId: paymentChainId,
@@ -312,7 +319,7 @@ export async function processNanopaymentX402(
         onChainSettlementQueuedId = reserveOnchainSettlement({
           ledgerEntryId,
           userId: clerkId,
-          circleWalletId: userWalletId,
+          circleWalletId: syncedUser.arcMainnetWalletId,
           amountUsdc: agentPriceUsdc,
           targetChainId: paymentChainId,
         });

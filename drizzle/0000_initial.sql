@@ -1,6 +1,7 @@
 CREATE TABLE `users` (
 	`user_id` text PRIMARY KEY NOT NULL,
 	`circle_wallet_id` text NOT NULL,
+	`arc_mainnet_wallet_id` text,
 	`address` text NOT NULL,
 	`ledger_balance_micro_usdc` integer NOT NULL,
 	`created_at` integer NOT NULL,
@@ -8,6 +9,8 @@ CREATE TABLE `users` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `users_circle_wallet_id_uidx` ON `users` (`circle_wallet_id`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `users_arc_mainnet_wallet_id_uidx` ON `users` (`arc_mainnet_wallet_id`);
 --> statement-breakpoint
 CREATE TABLE `ledger_entries` (
 	`id` text PRIMARY KEY NOT NULL,

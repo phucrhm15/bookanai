@@ -17,10 +17,13 @@ import {
   type SupportedChainId,
 } from "@/lib/chains";
 import { MARKETPLACE_SETTLE_TIMEOUT_MS } from "@/server/config/api-timeouts";
-import { dcwBlockchainsForApiKey } from "@/lib/circle-dcw-blockchains";
+import { dcwBlockchainsForApiKey, isLiveCircleApiKey } from "@/lib/circle-dcw-blockchains";
 import { getServerEnv, isCircleConfigured } from "@/server/config/env";
 import { userStore } from "@/server/storage/user-store";
-import { findExistingCircleWalletForClerk } from "@/server/services/circle-wallet-lookup";
+import {
+  findCircleWalletIdForClerkBlockchain,
+  findExistingCircleWalletForClerk,
+} from "@/server/services/circle-wallet-lookup";
 import { payX402Resource, type X402PayRequestInit } from "@/server/services/x402-master-pay";
 import type { ChainBalanceBreakdown, UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
@@ -73,16 +76,28 @@ function emptyOnChainBalance(): UnifiedBalanceSnapshot {
 /** On-chain USDC per chain via Developer-Controlled Wallets. */
 async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalanceSnapshot> {
   const client = getDcwClient();
-  const response = await client.getWalletTokenBalance({
-    id: walletId,
-    tokenAddresses: [
-      BASE_USDC_CONTRACT_ADDRESS,
-      ARC_USDC_CONTRACT_ADDRESS,
-      ARC_MAINNET_USDC_CONTRACT_ADDRESS,
-    ],
-  });
-
-  const tokens = response.data?.tokenBalances ?? [];
+  const user = userStore.getByWalletId(walletId);
+  if (!user) throw new CircleServiceError(`Unknown user wallet id: ${walletId}`, "WALLET_NOT_FOUND");
+  const env = getServerEnv();
+  const primaryTokenAddress = isLiveCircleApiKey(env.CIRCLE_API_KEY)
+    ? BASE_USDC_CONTRACT_ADDRESS
+    : ARC_USDC_CONTRACT_ADDRESS;
+  const balanceRequests = [
+    client.getWalletTokenBalance({
+      id: user.circleWalletId,
+      tokenAddresses: [primaryTokenAddress],
+    }),
+  ];
+  if (user.arcMainnetWalletId) {
+    balanceRequests.push(
+      client.getWalletTokenBalance({
+        id: user.arcMainnetWalletId,
+        tokenAddresses: [ARC_MAINNET_USDC_CONTRACT_ADDRESS],
+      }),
+    );
+  }
+  const responses = await Promise.all(balanceRequests);
+  const tokens = responses.flatMap((response) => response.data?.tokenBalances ?? []);
   const byChain = new Map<SupportedChainId, number>();
 
   for (const row of tokens) {
@@ -179,7 +194,7 @@ function parseUsdcAmount(value: string | undefined): number {
 }
 
 /**
- * Aggregated Gateway USDC across Base + Arc Testnet for a depositor address.
+ * Read per-chain USDC across the user's chain-specific Circle wallet ids.
  */
 export async function getUnifiedBalance(walletId: string): Promise<UnifiedBalanceSnapshot> {
   const user = userStore.getByWalletId(walletId);
@@ -196,12 +211,75 @@ export async function getUnifiedBalance(walletId: string): Promise<UnifiedBalanc
   }
 }
 
+async function ensureArcMainnetWalletId(
+  clerkId: string,
+  address: string,
+  client: ReturnType<typeof getDcwClient>,
+  env: ReturnType<typeof getServerEnv>,
+): Promise<string> {
+  const existing = await findCircleWalletIdForClerkBlockchain(
+    client,
+    env.CIRCLE_WALLET_SET_ID,
+    clerkId,
+    DCW_BLOCKCHAIN_ARC_MAINNET,
+  );
+  if (existing) {
+    if (existing.address.toLowerCase() !== address.toLowerCase()) {
+      throw new CircleServiceError(
+        "Circle Arc Mainnet wallet address does not match the user's EVM wallet address.",
+        "WALLET_NOT_FOUND",
+      );
+    }
+    return existing.id;
+  }
+
+  const created = await client.createWallets({
+    accountType: "EOA",
+    blockchains: [DCW_BLOCKCHAIN_ARC_MAINNET as never],
+    count: 1,
+    walletSetId: env.CIRCLE_WALLET_SET_ID,
+    idempotencyKey: randomUUID(),
+    metadata: [{ name: "bookanai-user-arc-mainnet", refId: clerkId }],
+  });
+  const arcWallet = created.data?.wallets?.find(
+    (wallet) => wallet.blockchain === DCW_BLOCKCHAIN_ARC_MAINNET,
+  ) ?? created.data?.wallets?.[0];
+  if (
+    !arcWallet?.id ||
+    !arcWallet.address ||
+    arcWallet.address.toLowerCase() !== address.toLowerCase()
+  ) {
+    throw new CircleServiceError(
+      "Circle could not provision this user's Arc Mainnet wallet. Verify the LIVE API key and wallet set.",
+      "UNSUPPORTED_CHAIN",
+    );
+  }
+  return arcWallet.id;
+}
+
 /**
- * Creates (or returns) a per-user EOA on Base + Arc Testnet — one address on both chains.
+ * Creates (or returns) the user's Circle EOA wallets for the active API-key environment.
  */
 export async function createUserEmbeddedWallet(userId: string): Promise<EmbeddedWalletInfo> {
   const existing = userStore.getByUserId(userId);
   if (existing) {
+    const env = getServerEnv();
+    let arcMainnetWalletId = existing.arcMainnetWalletId;
+    if (isLiveCircleApiKey(env.CIRCLE_API_KEY) && !arcMainnetWalletId) {
+      arcMainnetWalletId = await ensureArcMainnetWalletId(
+        userId,
+        existing.address,
+        getDcwClient(),
+        env,
+      );
+      userStore.upsertFromClerk({
+        clerkId: userId,
+        circleWalletId: existing.circleWalletId,
+        arcMainnetWalletId,
+        address: existing.address,
+        ledgerBalance: existing.ledgerBalance,
+      });
+    }
     const unified = await getUnifiedBalance(existing.circleWalletId);
     const { getOnchainSettlementHoldUsdc } = await import(
       "@/server/services/onchain-settlement"
@@ -224,26 +302,22 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
     userId,
   );
   if (reused) {
-    let unified: UnifiedBalanceSnapshot;
-    try {
-      unified = await getUnifiedBalance(reused.id);
-    } catch {
-      unified = {
-        totalUsdc: reused.usdcBalance,
-        totalConfirmedBalance: String(reused.usdcBalance),
-        breakdown: [],
-      };
-    }
+    const arcMainnetWalletId = isLiveCircleApiKey(env.CIRCLE_API_KEY)
+      ? reused.arcMainnetWalletId ??
+        (await ensureArcMainnetWalletId(userId, reused.address, client, env))
+      : null;
+    userStore.upsertFromClerk({
+      clerkId: userId,
+      circleWalletId: reused.id,
+      arcMainnetWalletId,
+      address: reused.address,
+      ledgerBalance: reused.usdcBalance,
+    });
+    const unified = await getUnifiedBalance(reused.id);
     const { getOnchainSettlementHoldUsdc } = await import(
       "@/server/services/onchain-settlement"
     );
     const hold = getOnchainSettlementHoldUsdc(userId);
-    userStore.upsertFromClerk({
-      clerkId: userId,
-      circleWalletId: reused.id,
-      address: reused.address,
-      ledgerBalance: unified.totalUsdc,
-    });
     const synced = userStore.reconcileDepositsFromOnChain(
       userId,
       unified.totalUsdc,
@@ -266,7 +340,11 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
     metadata: [{ name: "bookanai-user", refId: userId }],
   });
 
-  const wallet = walletsResponse.data?.wallets?.[0];
+  const wallets = walletsResponse.data?.wallets ?? [];
+  const wallet = wallets.find((item) => item.blockchain === DCW_BLOCKCHAIN_BASE) ?? wallets[0];
+  const arcMainnetWallet = wallets.find(
+    (item) => item.blockchain === DCW_BLOCKCHAIN_ARC_MAINNET,
+  );
   if (!wallet?.id || !wallet.address) {
     throw new CircleServiceError(
       "Circle did not return a wallet for embedded user",
@@ -274,23 +352,20 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
     );
   }
 
-  let unified: UnifiedBalanceSnapshot;
-  try {
-    unified = await getUnifiedBalance(wallet.id);
-  } catch {
-    unified = {
-      totalUsdc: 0,
-      totalConfirmedBalance: "0",
-      breakdown: [],
-    };
+  let arcMainnetWalletId = arcMainnetWallet?.id ?? null;
+  if (isLiveCircleApiKey(env.CIRCLE_API_KEY) && !arcMainnetWalletId) {
+    arcMainnetWalletId = await ensureArcMainnetWalletId(userId, wallet.address, client, env);
   }
-
-  const synced = userStore.upsertFromClerk({
+  userStore.upsertFromClerk({
     clerkId: userId,
     circleWalletId: wallet.id,
+    arcMainnetWalletId,
     address: wallet.address,
-    ledgerBalance: unified.totalUsdc,
+    ledgerBalance: 0,
   });
+
+  const unified = await getUnifiedBalance(wallet.id);
+  const synced = userStore.reconcileDepositsFromOnChain(userId, unified.totalUsdc);
 
   return buildWalletInfo(synced, unified);
 }

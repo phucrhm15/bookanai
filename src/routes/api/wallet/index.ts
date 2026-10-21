@@ -6,6 +6,7 @@ import {
   BASE_USDC_CONTRACT_ADDRESS,
   circleRuntimeReady,
   ensureClerkUserWalletSynced,
+  getUsdcBalanceForChain,
 } from "@/services/circleService";
 import { getServerEnv } from "@/server/config/env";
 import {
@@ -13,7 +14,10 @@ import {
   unauthorizedJsonResponse,
   UnauthorizedError,
 } from "@/server/auth/clerk-session";
-import { syncWalletCreditsForUser } from "@/server/services/onchain-settlement";
+import {
+  getOnchainSettlementHoldUsdc,
+  syncWalletCreditsForUser,
+} from "@/server/services/onchain-settlement";
 import { userStore } from "@/server/storage/user-store";
 
 export const Route = createFileRoute("/api/wallet/")({
@@ -34,6 +38,13 @@ export const Route = createFileRoute("/api/wallet/")({
             clerkId,
             wallet.unifiedBalance.totalUsdc,
           );
+          const env = getServerEnv();
+          const preferredChainId = defaultPaymentChainId(env.CIRCLE_API_KEY);
+          const preferredChainBalance = getUsdcBalanceForChain(
+            wallet.unifiedBalance,
+            preferredChainId,
+          );
+          const preferredChainHold = getOnchainSettlementHoldUsdc(clerkId, preferredChainId);
 
           return Response.json(
             {
@@ -41,8 +52,11 @@ export const Route = createFileRoute("/api/wallet/")({
               walletId: wallet.circleWalletId,
               address: wallet.address,
               ledgerBalance: credits.ledgerBalance,
-              spendableCreditsUsdc: credits.spendableCreditsUsdc,
-              settlementHoldUsdc: credits.holdUsdc,
+              spendableCreditsUsdc: Math.min(
+                credits.ledgerBalance,
+                Math.max(0, preferredChainBalance - preferredChainHold),
+              ),
+              settlementHoldUsdc: preferredChainHold,
               onChainUsdc: wallet.unifiedBalance.totalUsdc,
               unifiedBalance: wallet.unifiedBalance,
             },
@@ -85,6 +99,15 @@ export const Route = createFileRoute("/api/wallet/")({
               : preferredChainId === ARC_MAINNET_NETWORK.id
                 ? ARC_MAINNET_NETWORK
                 : ARC_NETWORK;
+          const preferredChainBalance = getUsdcBalanceForChain(
+            wallet.unifiedBalance,
+            preferredChainId,
+          );
+          const preferredChainHold = getOnchainSettlementHoldUsdc(clerkId, preferredChainId);
+          const spendableCreditsUsdc = Math.min(
+            credits.ledgerBalance,
+            Math.max(0, preferredChainBalance - preferredChainHold),
+          );
           const user = userStore.getByClerkId(clerkId);
 
           return Response.json({
@@ -92,8 +115,8 @@ export const Route = createFileRoute("/api/wallet/")({
             walletId: wallet.circleWalletId,
             address: wallet.address,
             ledgerBalance: credits.ledgerBalance,
-            spendableCreditsUsdc: credits.spendableCreditsUsdc,
-            settlementHoldUsdc: credits.holdUsdc,
+            spendableCreditsUsdc,
+            settlementHoldUsdc: preferredChainHold,
             onChainUsdc: wallet.unifiedBalance.totalUsdc,
             unifiedBalance: wallet.unifiedBalance,
             preferredChainId,

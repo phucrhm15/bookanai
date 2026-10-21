@@ -8,13 +8,18 @@ export const users = sqliteTable(
   {
     userId: text("user_id").primaryKey(),
     circleWalletId: text("circle_wallet_id").notNull(),
+    /** Separate Circle resource for Arc Mainnet; it shares the user's EVM address. */
+    arcMainnetWalletId: text("arc_mainnet_wallet_id"),
     address: text("address").notNull(),
     /** USDC × 10^6 — avoids floating-point ledger drift */
     ledgerBalanceMicroUsdc: integer("ledger_balance_micro_usdc").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (t) => [uniqueIndex("users_circle_wallet_id_uidx").on(t.circleWalletId)],
+  (t) => [
+    uniqueIndex("users_circle_wallet_id_uidx").on(t.circleWalletId),
+    uniqueIndex("users_arc_mainnet_wallet_id_uidx").on(t.arcMainnetWalletId),
+  ],
 );
 
 export const ledgerEntryKind = ["nanopayment", "deposit", "refund", "withdraw"] as const;

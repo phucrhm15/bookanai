@@ -51,6 +51,13 @@ function ensureMigrations(): void {
   if (!tableExists(database, "users")) {
     applyInitialSqlFile(database);
   }
+  const userColumns = database.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!userColumns.some((column) => column.name === "arc_mainnet_wallet_id")) {
+    database.exec("ALTER TABLE users ADD COLUMN arc_mainnet_wallet_id TEXT");
+  }
+  database.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS users_arc_mainnet_wallet_id_uidx ON users(arc_mainnet_wallet_id)",
+  );
 }
 
 export function getSqlite(): Database.Database {

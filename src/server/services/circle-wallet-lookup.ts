@@ -7,6 +7,7 @@ export type ExistingCircleWallet = {
   id: string;
   address: string;
   usdcBalance: number;
+  arcMainnetWalletId?: string;
 };
 
 function readRefId(wallet: Record<string, unknown>): string | undefined {
@@ -49,7 +50,7 @@ export async function findExistingCircleWalletForClerk(
   walletSetId: string,
   clerkId: string,
 ): Promise<ExistingCircleWallet | null> {
-  const matches: { id: string; address: string }[] = [];
+  const matches: { id: string; address: string; blockchain: string }[] = [];
   let pageAfter: string | undefined;
 
   for (let page = 0; page < 50; page++) {
@@ -63,7 +64,7 @@ export async function findExistingCircleWalletForClerk(
       if (!w?.id || !w.address) continue;
       const row = w as unknown as Record<string, unknown>;
       if (readRefId(row) === clerkId) {
-        matches.push({ id: w.id, address: w.address });
+        matches.push({ id: w.id, address: w.address, blockchain: String(w.blockchain) });
       }
     }
     pageAfter = res.data?.pagination?.nextPageAfter;
@@ -72,15 +73,22 @@ export async function findExistingCircleWalletForClerk(
 
   if (!matches.length) return null;
 
+  const primaryWallets = matches.filter((m) => m.blockchain === "BASE");
+  const candidates = primaryWallets.length ? primaryWallets : matches;
   let best: ExistingCircleWallet | null = null;
-  for (const m of matches) {
+  for (const m of candidates) {
     const usdcBalance = await fetchUsdcBalance(client, m.id);
     if (
       !best ||
       usdcBalance > best.usdcBalance ||
       (usdcBalance === best.usdcBalance && m.id < best.id)
     ) {
-      best = { ...m, usdcBalance };
+      best = {
+        id: m.id,
+        address: m.address,
+        usdcBalance,
+        arcMainnetWalletId: matches.find((wallet) => wallet.blockchain === "ARC")?.id,
+      };
     }
   }
 
@@ -92,4 +100,30 @@ export async function findExistingCircleWalletForClerk(
   }
 
   return best;
+}
+
+/** Find the chain-specific Circle wallet id for an existing Clerk user. */
+export async function findCircleWalletIdForClerkBlockchain(
+  client: DcwClient,
+  walletSetId: string,
+  clerkId: string,
+  blockchain: string,
+): Promise<{ id: string; address: string } | null> {
+  let pageAfter: string | undefined;
+  for (let page = 0; page < 50; page++) {
+    const res = await client.listWallets({
+      walletSetId,
+      pageSize: 50,
+      ...(pageAfter ? { pageAfter } : {}),
+    });
+    const wallets = res.data?.wallets ?? [];
+    const match = wallets.find((wallet) => {
+      if (!wallet?.id || !wallet.address || String(wallet.blockchain) !== blockchain) return false;
+      return readRefId(wallet as unknown as Record<string, unknown>) === clerkId;
+    });
+    if (match?.id && match.address) return { id: match.id, address: match.address };
+    pageAfter = res.data?.pagination?.nextPageAfter;
+    if (!pageAfter || wallets.length === 0) break;
+  }
+  return null;
 }

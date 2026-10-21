@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, or, sql } from "drizzle-orm";
 import type { WalletTransaction } from "@/lib/transaction-types";
 import { getDb, withImmediateTransaction } from "@/server/db/client";
 import { ledgerEntries, users } from "@/server/db/schema";
@@ -13,6 +13,7 @@ export type UserRecord = {
   /** Clerk user id (`users.user_id`) */
   userId: ClerkId;
   circleWalletId: string;
+  arcMainnetWalletId: string | null;
   address: string;
   ledgerBalance: number;
   transactions: WalletTransaction[];
@@ -45,6 +46,7 @@ function rowToUserRecord(
   return {
     userId: row.userId,
     circleWalletId: row.circleWalletId,
+    arcMainnetWalletId: row.arcMainnetWalletId,
     address: row.address,
     ledgerBalance: microToUsdc(row.ledgerBalanceMicroUsdc),
     transactions,
@@ -107,7 +109,7 @@ export const userStore = {
     const row = db
       .select()
       .from(users)
-      .where(eq(users.circleWalletId, walletId))
+      .where(or(eq(users.circleWalletId, walletId), eq(users.arcMainnetWalletId, walletId)))
       .get();
     if (!row) return undefined;
     return rowToUserRecord(row, fetchLedgerHistory(row.userId));
@@ -119,6 +121,7 @@ export const userStore = {
   upsertFromClerk(params: {
     clerkId: ClerkId;
     circleWalletId: string;
+    arcMainnetWalletId?: string | null;
     address: string;
     ledgerBalance: number;
   }): UserRecord {
@@ -137,6 +140,9 @@ export const userStore = {
         db.update(users)
           .set({
             circleWalletId: params.circleWalletId,
+            ...(params.arcMainnetWalletId !== undefined
+              ? { arcMainnetWalletId: params.arcMainnetWalletId }
+              : {}),
             address: params.address,
             ledgerBalanceMicroUsdc: micro,
             updatedAt: now,
@@ -148,6 +154,7 @@ export const userStore = {
           .values({
             userId: params.clerkId,
             circleWalletId: params.circleWalletId,
+            arcMainnetWalletId: params.arcMainnetWalletId ?? null,
             address: params.address,
             ledgerBalanceMicroUsdc: micro,
             createdAt: now,

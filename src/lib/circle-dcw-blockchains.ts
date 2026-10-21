@@ -15,7 +15,8 @@ import {
  */
 export function dcwBlockchainsForApiKey(apiKey: string): Blockchain[] {
   if (apiKey.startsWith("LIVE_API_KEY")) {
-    return [DCW_BLOCKCHAIN_BASE];
+    // Mainnet chains may coexist; Circle issues a chain-specific wallet id per network.
+    return [DCW_BLOCKCHAIN_BASE, DCW_BLOCKCHAIN_ARC_MAINNET as Blockchain];
   }
   if (apiKey.startsWith("TEST_API_KEY")) {
     return [DCW_BLOCKCHAIN_ARC];
@@ -29,7 +30,7 @@ export function isLiveCircleApiKey(apiKey: string): boolean {
 
 /** Chain id used for x402 nanopayments — must match API key environment. */
 export function defaultPaymentChainId(apiKey: string): SupportedChainId {
-  return isLiveCircleApiKey(apiKey) ? BASE_CHAIN_ID : ARC_CHAIN_ID;
+  return isLiveCircleApiKey(apiKey) ? ARC_MAINNET_CHAIN_ID : ARC_CHAIN_ID;
 }
 
 export function dcwBlockchainForPaymentChain(chainId: SupportedChainId): Blockchain {

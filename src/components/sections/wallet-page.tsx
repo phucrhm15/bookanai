@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ARC_NETWORK, BASE_NETWORK } from "@/lib/chains";
+import { ARC_MAINNET_NETWORK, ARC_NETWORK, BASE_NETWORK } from "@/lib/chains";
 import { useWallet } from "@/hooks/use-wallet";
 import {
   AlertTriangle,
@@ -45,7 +45,10 @@ export function WalletPage() {
   const settlementHold = data?.settlementHoldUsdc ?? 0;
   const chainBreakdown = data?.unifiedBalance?.breakdown ?? [];
   const baseNetwork = data?.networks?.base ?? BASE_NETWORK;
-  const arcNetwork = data?.networks?.arc ?? ARC_NETWORK;
+  const arcNetwork =
+    data?.preferredChainId === ARC_MAINNET_NETWORK.id
+      ? data.networks?.arcMainnet ?? ARC_MAINNET_NETWORK
+      : data?.networks?.arc ?? ARC_NETWORK;
   const usdcContract = arcNetwork.usdcContractAddress ?? data?.usdcContractAddress ?? "0x3600000000000000000000000000000000000000";
   const appKitDefaultChain =
     (data?.preferredChainId ?? BASE_CHAIN_ID) === BASE_CHAIN_ID ? UB_CHAIN_BASE : UB_CHAIN_ARC;

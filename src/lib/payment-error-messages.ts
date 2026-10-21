@@ -1,333 +1,40 @@
 import type { Locale } from "@/lib/i18n/types";
 import { DEFAULT_LOCALE } from "@/lib/i18n/types";
-import { buildUniswapArcSwapUrl } from "@/lib/arc-testnet-ecosystem";
 
-const MASTER_GATEWAY_USDC_RE =
-  /Circle Gateway thiếu USDC|Gateway thiếu USDC/i;
-const MASTER_ONCHAIN_BASE_RE =
-  /thiếu USDC on-chain trên Base|USDC on-chain on Base|x402 exact \(Web Search\)|khác với npm run gateway:deposit/i;
-const MASTER_ONCHAIN_ARC_MAINNET_RE =
-  /thiếu USDC on-chain trên Arc Mainnet|USDC on-chain trên Arc Mainnet|x402 exact\. Nạp USDC trực tiếp vào.*trên Arc Mainnet/i;
-const USER_ONCHAIN_TRANSFER_RE =
-  /Không thể chuyển USDC từ ví|Ví on-chain không đủ USDC để chi trả API|User-to-master USDC transfer/i;
-const USER_USDC_RE =
-  /Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient USDC|khả dụng|Insufficient balance|Content Credits/i;
-const CIRCLE_DCW_ARC_MAINNET_RE =
-  /insufficient token balance.*wallet|the asset amount owned by the wallet is insufficient/i;
-const GAS_RE =
-  /native token|insufficient funds for gas|max fee per gas|gas required exceeds|ETH gas/i;
-const NETWORK_SCHEME_RE =
-  /No network\/scheme registered|x402Version|paymentRequirements|eip155:137|GatewayWalletBatched/i;
-const PAYMENT_VERIFY_RE =
-  /Payment verification failed|payment verification failed|x402 verify failed/i;
-const AISA_API_KEY_RE = /invalid api key/i;
-const RPC_AUTH_RE =
-  /polygon-rpc\.com|API key disabled|tenant disabled|json-rpc code: -32051/i;
-const MARKET_TIMEOUT_RE =
-  /AI Agent Marketplace did not respond within|did not respond within \d+ms|TIMEOUT/i;
-const PROBE_HTTP_RE =
-  /Agent không phát hành x402 402|Probe x402 marketplace|không có giá trong Discovery metadata/i;
-const UPSTREAM_502_RE = /HTTP 502|HTTP 503|Bad gateway|error-502/i;
-const POLYGON_CONTEXT_RE = /polygon|eip155:137|surf|nano\.blockrun/i;
-
-function spendableLooksZero(message: string): boolean {
-  const m = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
-  return m ? Number(m[1]) < 0.000_001 : false;
-}
-
-function extractAddress(message: string): string | undefined {
-  const match = message.match(/0x[a-fA-F0-9]{40}/);
-  return match?.[0];
-}
-
-/**
- * Rewrite server/CLI errors for end users (locale-aware).
- */
+/** Keep payment errors truthful: a local ledger debit alone is not an on-chain receipt. */
 export function formatPaymentErrorForUser(
   rawMessage: string,
   locale: Locale = DEFAULT_LOCALE,
 ): string {
   const message = rawMessage.trim();
+  const vi = locale === "vi";
+
   if (!message) {
-    return locale === "vi"
-      ? "Thanh toán thất bại. Thử lại sau."
-      : "Payment failed. Please try again.";
+    return vi ? "Thanh toán thất bại. Vui lòng thử lại." : "Payment failed. Please try again.";
   }
 
-  if (MASTER_ONCHAIN_BASE_RE.test(message)) {
-    const addr = extractAddress(message);
-    if (locale === "vi") {
-      return (
-        "Web Search trả API bằng x402 exact trên Base — ví master server cần USDC **on-chain** (~0.007 USDC/lần), " +
-        "không phải Content Credits của bạn và **không** dùng npm run gateway:deposit. " +
-        (addr
-          ? `Admin: chuyển ≥0.02 USDC (mạng Base) vào ${addr} · npm run show:x402`
-          : "Admin: npm run show:x402 → nạp USDC trực tiếp trên Base.")
-      );
-    }
-    return (
-      "Web Search pay via exact x402 on Base — the server master wallet needs **on-chain** USDC (~0.007/call), " +
-      "not your Content Credits and **not** npm run gateway:deposit. " +
-      (addr
-        ? `Admin: send ≥0.02 USDC on Base to ${addr} · npm run show:x402`
-        : "Admin: npm run show:x402 → fund USDC directly on Base.")
-    );
+  if (/Số dư không đủ|INSUFFICIENT_BALANCE|Insufficient (?:USDC|ledger|balance)|Content Credits/i.test(message)) {
+    return vi
+      ? "Số dư khả dụng không đủ cho báo giá x402 hiện tại. Nạp thêm USDC trên Arc Mainnet rồi thử lại."
+      : "Your available balance is below the current x402 quote. Add USDC on Arc Mainnet and retry.";
   }
 
-  // Do not match Surf/Gateway message for Arc Mainnet errors
-  const isArcMainnetErr = /Arc Mainnet|chain 5042[^0]|eip155:5042[^0]/i.test(message);
-  if (!isArcMainnetErr && (MASTER_GATEWAY_USDC_RE.test(message) || /Master wallet|Ví Master thiếu USDC|Gateway Polygon unavailable|Surf cần USDC trong Gateway/i.test(message))) {
-    const addr = extractAddress(message);
-    const needsPolygon = POLYGON_CONTEXT_RE.test(message);
-    if (locale === "vi") {
-      return (
-        `Hệ thống chưa đủ USDC Gateway Polygon để trả API Surf (ví master server, không phải Content Credits của bạn). ` +
-        `Content Credits đã được hoàn nếu bạn thấy dòng Refund trong lịch sử. ` +
-        (addr
-          ? needsPolygon
-            ? `Admin nạp USDC + MATIC trên Polygon vào ${addr}, rồi chạy: npm run gateway:deposit -- 0.05 polygon`
-            : `Admin nạp thêm USDC (Base) vào ${addr} hoặc chạy: npm run gateway:deposit -- 0.15`
-          : needsPolygon
-            ? "Admin chạy: npm run show:x402 rồi nạp USDC + MATIC trên Polygon, sau đó: npm run gateway:deposit -- 0.05 polygon"
-            : "Admin chạy: npm run show:x402 rồi npm run gateway:deposit -- 0.15")
-      );
-    }
-    return (
-      "The server does not have enough Gateway USDC to pay Surf (Polygon master wallet, not your Content Credits). " +
-      "Credits were refunded if you see a Refund line in history. " +
-      (addr
-        ? needsPolygon
-          ? `Admin: fund ${addr} with USDC + MATIC on Polygon, then run: npm run gateway:deposit -- 0.05 polygon`
-          : `Admin: deposit USDC on Base to ${addr} or run: npm run gateway:deposit -- 0.15`
-        : needsPolygon
-          ? "Admin: npm run show:x402, fund USDC + MATIC on Polygon, then run: npm run gateway:deposit -- 0.05 polygon"
-          : "Admin: npm run show:x402 then npm run gateway:deposit -- 0.15")
-    );
+  if (/HTTP 402|did not return a live HTTP 402|x402 quote/i.test(message)) {
+    return vi
+      ? "Dịch vụ chưa trả báo giá x402 hợp lệ. App chưa gửi thanh toán; hãy thử lại sau."
+      : "The provider did not return a valid x402 quote. No payment was sent; please retry later.";
   }
 
-  if (MASTER_ONCHAIN_ARC_MAINNET_RE.test(message)) {
-    const addr = extractAddress(message);
-    if (locale === "vi") {
-      return (
-        "Ví master server thiếu USDC on-chain trên Arc Mainnet (chain 5042) để thanh toán agent Arc Mainnet. " +
-        "Đây là USDC thật — không phải Content Credits của bạn. " +
-        (addr
-          ? `Admin: nạp USDC vào ${addr} trên Arc Mainnet (chain ID 5042) · npm run show:x402`
-          : "Admin: npm run show:x402 → nạp USDC thật trên Arc Mainnet vào địa chỉ in ra.")
-      );
-    }
-    return (
-      "The server master wallet lacks on-chain USDC on Arc Mainnet (chain 5042) to pay Arc Mainnet agents. " +
-      "These are real funds — not your Content Credits. " +
-      (addr
-        ? `Admin: fund ${addr} with USDC on Arc Mainnet (chain ID 5042) · npm run show:x402`
-        : "Admin: npm run show:x402 → fund the printed address with real USDC on Arc Mainnet.")
-    );
+  if (/timeout|timed out|did not respond within/i.test(message)) {
+    return vi
+      ? "Dịch vụ nghiên cứu phản hồi quá thời gian. Hãy kiểm tra lịch sử ví trước khi chạy lại để tránh gọi trùng."
+      : "The research provider timed out. Check wallet activity before retrying to avoid a duplicate call.";
   }
 
-  if (CIRCLE_DCW_ARC_MAINNET_RE.test(message)) {
-    // Circle DCW does not support ARC mainnet — user wallet has 0 balance on that chain.
-    // After hướng B fix: master pays first, this error only appears for settlement reimbursement queue.
-    if (locale === "vi") {
-      return (
-        "Lần chạy agent Arc Mainnet thành công — USDC đã được trừ từ Content Credits. " +
-        "Thanh toán on-chain đang được xử lý theo lô (Circle chưa hỗ trợ ARC mainnet cho ví DCW). " +
-        "Kết quả đã trả về đầy đủ."
-      );
-    }
-    return (
-      "Arc Mainnet agent ran successfully — USDC debited from Content Credits. " +
-      "On-chain reimbursement queued in batch (Circle DCW does not yet support ARC mainnet blockchain). " +
-      "Your result has been returned."
-    );
-  }
-
-  if (GAS_RE.test(message)) {
-    const addr = extractAddress(message);
-    // Detect Arc Mainnet context from message (chain 5042 agents don't use ETH gas — USDC is native)
-    const isArcMainnetCtx = /Arc Mainnet|chain 5042[^0]|arc mainnet/i.test(message);
-    if (isArcMainnetCtx) {
-      if (locale === "vi") {
-        return (
-          "Lỗi gas trên Arc Mainnet cho ví x402 server. Trên Arc, USDC là native gas — " +
-          "ví master cần USDC trên Arc Mainnet (chain 5042), không cần ETH. " +
-          (addr
-            ? `Admin: nạp USDC vào ${addr} trên Arc Mainnet · npm run show:x402`
-            : "Admin: npm run show:x402 → nạp USDC Arc Mainnet.")
-        );
-      }
-      return (
-        "Gas error on Arc Mainnet for the server x402 wallet. On Arc, USDC is native gas — " +
-        "the master wallet needs USDC on Arc Mainnet (chain 5042), not ETH. " +
-        (addr
-          ? `Admin: fund ${addr} with USDC on Arc Mainnet · npm run show:x402`
-          : "Admin: npm run show:x402 → fund with USDC on Arc Mainnet.")
-      );
-    }
-    if (locale === "vi") {
-      return (
-        "Thiếu ETH gas trên Base cho ví x402 của server (MASTER_AGENT_PRIVATE_KEY), " +
-        "không phải ví bạn dùng để nạp Content Credits. " +
-        (addr
-          ? `Admin nạp ~0.001–0.002 ETH (Base) vào ${addr} · npm run show:x402`
-          : "Admin: npm run show:x402 — nạp ETH Base vào địa chỉ in ra.")
-      );
-    }
-    return (
-      "Insufficient ETH gas on Base for the server x402 wallet (MASTER_AGENT_PRIVATE_KEY), " +
-      "not your Content Credits wallet. " +
-      (addr
-        ? `Admin: send ~0.001–0.002 ETH (Base) to ${addr} · npm run show:x402`
-        : "Admin: npm run show:x402 — fund ETH on the printed address.")
-    );
-  }
-
-  if (RPC_AUTH_RE.test(message)) {
-    if (locale === "vi") {
-      return (
-        "RPC Polygon trên server bị từ chối (polygon-rpc.com cần API key). " +
-        "Admin: đặt POLYGON_RPC_URL=https://polygon.llamarpc.com trên Render, redeploy, " +
-        "và đảm bảo ví master có USDC trong Circle Gateway Polygon + MATIC gas."
-      );
-    }
-    return (
-      "Polygon RPC on the server was rejected (polygon-rpc.com requires an API key). " +
-      "Admin: set POLYGON_RPC_URL=https://polygon.llamarpc.com on Render, redeploy, " +
-      "and ensure the master wallet has Gateway USDC on Polygon plus MATIC for gas."
-    );
-  }
-
-  if (UPSTREAM_502_RE.test(message) && /sau thanh toán x402|after x402 payment/i.test(message)) {
-    return locale === "vi"
-      ? "API marketplace phản hồi lỗi 502/503 sau khi trả tiền x402 (server nhà cung cấp quá tải). Content Credits đã hoàn — thử lại sau 1–2 phút."
-      : "Marketplace API returned 502/503 after x402 payment (provider overload). Credits refunded — retry in 1–2 minutes.";
-  }
-
-  if (PROBE_HTTP_RE.test(message)) {
-    return locale === "vi"
-      ? "Marketplace phản hồi lỗi hoặc chưa trả HTTP 402. App đã thử lấy giá từ catalog Circle — thử lại sau vài giây hoặc dùng Surf (đang hoạt động)."
-      : "Marketplace returned an error or no HTTP 402. The app falls back to the Circle catalog price — retry in a few seconds or use Surf (currently working).";
-  }
-
-  if (MARKET_TIMEOUT_RE.test(message)) {
-    return locale === "vi"
-      ? "Marketplace phản hồi chậm hơn dự kiến. Thử lại sau 5-10 giây. Nếu lỗi lặp lại, dùng Surf trước hoặc thử prompt ngắn hơn."
-      : "Marketplace responded slower than expected. Retry in 5-10 seconds. If it keeps happening, use Surf first or try a shorter prompt.";
-  }
-
-  if (AISA_API_KEY_RE.test(message)) {
-    if (locale === "vi") {
-      return (
-        "API AIsa (Perplexity) từ chối yêu cầu — marketplace có thể đang lỗi (endpoint không trả HTTP 402 đúng chuẩn x402). " +
-        "Thử agent Surf (đã hoạt động khi Gateway Polygon đủ USDC) hoặc liên hệ Circle/AIsa. Gateway Base admin: npm run gateway:status."
-      );
-    }
-    return (
-      "AIsa (Perplexity) rejected the request — the marketplace endpoint may be misconfigured (no proper HTTP 402). " +
-      "Try Surf (works when Polygon Gateway is funded) or contact Circle/AIsa. Admin: npm run gateway:status for Base Gateway."
-    );
-  }
-
-  if (PAYMENT_VERIFY_RE.test(message)) {
-    if (locale === "vi") {
-      return (
-        "Thanh toán x402 không được Surf xác minh. Surf dùng Circle Gateway trên Polygon — " +
-        "ví master (MASTER_AGENT_PRIVATE_KEY) cần USDC trong Gateway Polygon và MATIC gas. " +
-        "Chạy npm run show:x402 để xem địa chỉ master."
-      );
-    }
-    return (
-      "x402 payment was not verified by Surf. Surf uses Circle Gateway on Polygon — " +
-      "the master wallet (MASTER_AGENT_PRIVATE_KEY) needs Gateway USDC on Polygon plus MATIC for gas. " +
-      "Run npm run show:x402 for the master address."
-    );
-  }
-
-  if (NETWORK_SCHEME_RE.test(message)) {
-    if (locale === "vi") {
-      return (
-        "Agent này hiện yêu cầu mạng thanh toán khác (thấy eip155:137 = Polygon), " +
-        "trong khi hệ thống đang settle x402 trên Base (8453). " +
-        "Đã bật auto-route cho Base/Polygon, nhưng ví master cần có USDC (và gas) trên mạng mà agent yêu cầu."
-      );
-    }
-    return (
-      "This agent currently requires a different payment network (detected eip155:137 = Polygon), " +
-      "while the app settles x402 on Base (8453). " +
-      "Auto-routing is enabled for Base/Polygon, but the master wallet must have USDC (and gas) on the required network."
-    );
-  }
-
-  if (USER_ONCHAIN_TRANSFER_RE.test(message)) {
-    if (locale === "vi") {
-      return (
-        "Không thể chuyển USDC từ ví Content Credits của bạn để trả API agent. " +
-        "Mở Wallet & Billing → kiểm tra số dư on-chain trên Base (cần đủ USDC cho lần gọi, không chỉ ledger). " +
-        "Nạp thêm USDC Base nếu cần — Circle Programmable Wallet không cần ETH gas từ bạn."
-      );
-    }
-    return (
-      "Could not transfer USDC from your Content Credits wallet to pay the agent API. " +
-      "Open Wallet & Billing — confirm on-chain Base USDC (not just ledger balance). " +
-      "Top up USDC on Base if needed; Circle Programmable Wallets do not require ETH gas from you."
-    );
-  }
-
-  if (USER_USDC_RE.test(message) && !MASTER_GATEWAY_USDC_RE.test(message) && !MASTER_ONCHAIN_BASE_RE.test(message)) {
-    const holdMatch = message.match(/đang giữ chuyển ([\d.]+)|hold ([\d.]+)/i);
-    const ledgerMatch = message.match(/ledger ([\d.]+)/i);
-    const onChainMatch = message.match(/ví on-chain ([\d.]+)|on-chain ([\d.]+)/i);
-    const hold = holdMatch ? Number(holdMatch[1] ?? holdMatch[2]) : 0;
-    const ledger = ledgerMatch ? Number(ledgerMatch[1]) : 0;
-    const onChain = onChainMatch ? Number(onChainMatch[1] ?? onChainMatch[2]) : 0;
-    const requiredMatch = message.match(/Cần ([\d.]+)|Required[:\s]+([\d.]+)/i);
-    const required = requiredMatch
-      ? Number(requiredMatch[1] ?? requiredMatch[2])
-      : 0;
-    const availMatch = message.match(/khả dụng ([\d.]+)|available ([\d.]+)/i);
-    const available = availMatch ? Number(availMatch[1] ?? availMatch[2]) : 0;
-    const swapUrl = buildUniswapArcSwapUrl({
-      tokenIn: "EURC",
-      tokenOut: "USDC",
-      amount: required > 0 ? required.toFixed(4) : undefined,
-    });
-
-    if (locale === "vi") {
-      let hint =
-        "Mở Wallet & Billing → Top Up (USDC trên Base). Không cần ETH cho ví của bạn.";
-      if (onChain > 0 && ledger < 0.01 && hold < 0.000_001) {
-        hint = "Ví on-chain có USDC nhưng Content Credits chưa đồng bộ — refresh trang Wallet rồi thử lại.";
-      } else if (hold > 0.001 && spendableLooksZero(message)) {
-        hint =
-          "Một phần số dư đang chờ chuyển on-chain (hoặc treo sau lỗi). Đợi 1–2 phút, refresh Wallet, thử lại.";
-      } else if (hold > 0.001 && onChain > ledger && required > available) {
-        const topUp = Math.max(0.01, required - available);
-        hint =
-          `~${hold.toFixed(3)} USDC đang chờ settle sau các lần chạy agent trước (ví on-chain ${onChain.toFixed(3)} USDC, credits khả dụng ${available.toFixed(3)}). ` +
-          `Nạp thêm ~${topUp.toFixed(2)} USDC (Base) hoặc chọn agent rẻ hơn (Surf ~0.001 USDC). Mở Wallet để xử lý settle.`;
-      }
-      return `Số dư Content Credits không đủ cho lần gọi này. ${hint} Nếu bạn đang giữ token khác, có thể swap sang USDC trên Uniswap (Arc): ${swapUrl}`;
-    }
-
-    let hint = "Open Wallet & Billing → Top Up (USDC on Base). You do not need ETH in your wallet.";
-    if (onChain > 0 && ledger < 0.01 && hold < 0.000_001) {
-      hint = "On-chain USDC exists but Content Credits are out of sync — refresh Wallet and retry.";
-    } else if (hold > 0.001 && spendableLooksZero(message)) {
-      hint =
-        "Part of your balance is pending on-chain transfer (or stuck after an error). Wait 1–2 minutes, refresh Wallet, retry.";
-    } else if (hold > 0.001 && onChain > ledger && required > available) {
-      const topUp = Math.max(0.01, required - available);
-      hint =
-        `~${hold.toFixed(3)} USDC is settling from earlier agent runs (on-chain ${onChain.toFixed(3)} USDC, spendable credits ${available.toFixed(3)}). ` +
-        `Top up ~${topUp.toFixed(2)} USDC on Base or pick a cheaper agent (Surf ~0.001 USDC). Open Wallet to process settlement.`;
-    }
-    return `Insufficient Content Credits for this call. ${hint} If you hold another token, swap to USDC on Uniswap (Arc): ${swapUrl}`;
-  }
-
-  if (message.includes("Gateway batching") || message.includes("No Gateway batching")) {
-    return locale === "vi"
-      ? "Đang kết nối lại với x402. Thử Run Agent lần nữa."
-      : "Reconnecting to x402. Try Run Agent again.";
+  if (/gas|insufficient funds/i.test(message) && /Arc|5042|eip155:5042/i.test(message)) {
+    return vi
+      ? "Ví thanh toán của dịch vụ thiếu USDC trên Arc Mainnet để trả phí giao dịch."
+      : "The provider payment wallet lacks USDC on Arc Mainnet for transaction fees.";
   }
 
   return message;

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { defaultPaymentChainId } from "@/lib/circle-dcw-blockchains";
-import { ARC_NETWORK, BASE_NETWORK } from "@/lib/mock-data";
+import { ARC_MAINNET_NETWORK, ARC_NETWORK, BASE_NETWORK } from "@/lib/chains";
 import {
   ARC_USDC_CONTRACT_ADDRESS,
   BASE_USDC_CONTRACT_ADDRESS,
@@ -80,7 +80,11 @@ export const Route = createFileRoute("/api/wallet/")({
 
           const preferredChainId = defaultPaymentChainId(env.CIRCLE_API_KEY);
           const preferredNetwork =
-            preferredChainId === BASE_NETWORK.id ? BASE_NETWORK : ARC_NETWORK;
+            preferredChainId === BASE_NETWORK.id
+              ? BASE_NETWORK
+              : preferredChainId === ARC_MAINNET_NETWORK.id
+                ? ARC_MAINNET_NETWORK
+                : ARC_NETWORK;
           const user = userStore.getByClerkId(clerkId);
 
           return Response.json({
@@ -101,6 +105,10 @@ export const Route = createFileRoute("/api/wallet/")({
               },
               arc: {
                 ...ARC_NETWORK,
+                usdcContractAddress: ARC_USDC_CONTRACT_ADDRESS,
+              },
+              arcMainnet: {
+                ...ARC_MAINNET_NETWORK,
                 usdcContractAddress: ARC_USDC_CONTRACT_ADDRESS,
               },
             },

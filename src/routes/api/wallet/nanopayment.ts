@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { defaultPaymentChainId } from "@/lib/circle-dcw-blockchains";
 import { getServerEnv } from "@/server/config/env";
 import { NANOPAYMENT_ROUTE_BUDGET_MS } from "@/server/config/api-timeouts";
-import { RESEARCH_STACK_B_ROUTE_BUDGET_MS } from "@/server/services/research-stack-b";
 import { CircleServiceError } from "@/services/circle-errors";
 import { circleRuntimeReady, ensureClerkUserWalletSynced } from "@/services/circleService";
 import { processNanopaymentX402 } from "@/server/services/nanopayment-x402";
@@ -79,11 +78,6 @@ export const Route = createFileRoute("/api/wallet/nanopayment")({
           const env = getServerEnv();
           const targetChainId = body.targetChainId ?? defaultPaymentChainId(env.CIRCLE_API_KEY);
 
-          const routeBudgetMs =
-            body.agentServiceId === "crypto-research-b"
-              ? RESEARCH_STACK_B_ROUTE_BUDGET_MS
-              : NANOPAYMENT_ROUTE_BUDGET_MS;
-
           const result = await withRouteBudget(
             () =>
               processNanopaymentX402(
@@ -94,7 +88,7 @@ export const Route = createFileRoute("/api/wallet/nanopayment")({
                 body.prompt,
                 body.idempotencyKey,
               ),
-            routeBudgetMs,
+            NANOPAYMENT_ROUTE_BUDGET_MS,
           );
 
           return Response.json(result);

@@ -79,22 +79,22 @@ export const Route = createRootRouteWithContext<{
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Nano.Agent — x402 AI agents · USDC on Base" },
+      { title: "BookAnAI — Arc Research · USDC on Arc Mainnet" },
       {
         name: "description",
-        content: "Surf & Exa via x402, X thread formatting. Circle wallets + Clerk.",
+        content: "AI web and news research with citations, paid through x402 on Arc Mainnet.",
       },
-      { property: "og:title", content: "Nano.Agent" },
+      { property: "og:title", content: "BookAnAI Arc Research" },
       {
         property: "og:description",
-        content: "Pay-per-call AI agents with USDC micropayments on Base.",
+        content: "Research crypto and Arc with AI search paid per request in USDC on Arc Mainnet.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Nano.Agent" },
+      { name: "twitter:title", content: "BookAnAI Arc Research" },
       {
         name: "twitter:description",
-        content: "x402 data & search agents — USDC on Base.",
+        content: "x402 AI research and source citations paid in USDC on Arc Mainnet.",
       },
     ],
     links: [

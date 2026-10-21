@@ -159,6 +159,16 @@ export type EmbeddedWalletInfo = {
   usdcContractAddress: string;
 };
 
+/** Return only the USDC balance on the chain that will execute the payment. */
+export function getUsdcBalanceForChain(
+  snapshot: UnifiedBalanceSnapshot,
+  chainId: SupportedChainId,
+): number {
+  const entry = snapshot.breakdown.find((balance) => balance.chainId === chainId);
+  const amount = Number(entry?.confirmedBalance ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
 export { CircleServiceError } from "@/services/circle-errors";
 import { CircleServiceError } from "@/services/circle-errors";
 
@@ -317,6 +327,8 @@ export type NanopaymentResult = {
   unifiedBalance: number;
   responseStatus: number;
   responsePreview: string;
+  /** x402 provider's settled transaction hash, when returned by its facilitator. */
+  providerPaymentTxHash?: string;
   /** Full API body for frontend formatting */
   rawResponse: string;
   generatedContent: string;
@@ -336,7 +348,7 @@ async function settleWithMasterAgent(
   targetChainId: SupportedChainId,
   minUsdc: number,
   payOptions?: X402PayRequestInit,
-): Promise<{ status?: number; data?: unknown }> {
+): Promise<{ status?: number; data?: unknown; providerPaymentTxHash?: string }> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= PAYMENT_MAX_RETRIES; attempt++) {
@@ -363,7 +375,7 @@ export async function settleWithMasterAgentBounded(
   targetChainId: SupportedChainId,
   minUsdc: number,
   payOptions?: X402PayRequestInit,
-): Promise<{ status?: number; data?: unknown }> {
+): Promise<{ status?: number; data?: unknown; providerPaymentTxHash?: string }> {
   return withTimeout(
     settleWithMasterAgent(resourceUrl, targetChainId, minUsdc, payOptions),
     MARKETPLACE_SETTLE_TIMEOUT_MS,

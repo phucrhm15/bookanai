@@ -1,399 +1,175 @@
-import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/tanstack-react-start";
-import { useActiveAgent } from "@/lib/agent-store";
+import { toast } from "sonner";
+import { ArrowUpRight, Loader2, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Info, Loader2, Sparkles, Wand2 } from "lucide-react";
-import { TweetThreadPreview } from "@/components/TweetThreadPreview";
-import { BASE_CHAIN_ID, BASE_NETWORK, ARC_CHAIN_ID, ARC_NETWORK, ARC_MAINNET_CHAIN_ID, ARC_MAINNET_NETWORK } from "@/lib/chains";
-import { postNanopayment } from "@/lib/wallet-api";
-import {
-  agentPromptMismatch,
-  defaultPromptForAgent,
-  getAgentStudioInput,
-} from "@/lib/agent-prompt-hints";
-import { agentRunsOnArcTestnet, agentRunsOnArcMainnet } from "@/lib/mock-data";
-import { ARC_TESTNET_AGENT_IDS, ARC_MAINNET_AGENT_IDS } from "@/lib/arc-agent-network";
-import { buildUniswapArcSwapUrl } from "@/lib/arc-testnet-ecosystem";
-import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
-import { translate } from "@/lib/i18n/translate";
-import { useTranslation } from "@/lib/i18n/locale-context";
+import { ARC_MAINNET_CHAIN_ID } from "@/lib/chains";
+import { postNanopayment, type NanopaymentApiResponse } from "@/lib/wallet-api";
 import { useWallet, walletQueryKey } from "@/hooks/use-wallet";
+import { useTranslation } from "@/lib/i18n/locale-context";
 
-type GenState = "idle" | "authorizing" | "generating" | "done";
-type StudioErrorState = { message: string; swapUrl?: string } | null;
+type ResearchResult = {
+  query?: string;
+  summary?: string;
+  citations?: Array<{ title?: string; url?: string }>;
+  sources_used?: number;
+  model?: string;
+};
+
+function readResult(response: NanopaymentApiResponse): ResearchResult {
+  const value: unknown = JSON.parse(response.rawResponse);
+  if (!value || typeof value !== "object") throw new Error("The research API returned an invalid response.");
+  return value as ResearchResult;
+}
 
 export function Studio() {
-  const { activeAgent } = useActiveAgent();
   const { userId } = useAuth();
-  const queryClient = useQueryClient();
   const { data: wallet } = useWallet();
-  const { t, locale } = useTranslation();
+  const queryClient = useQueryClient();
+  const { locale } = useTranslation();
+  const vi = locale === "vi";
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ data: ResearchResult; payment: NanopaymentApiResponse } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
-  const [prompt, setPrompt] = useState(() => defaultPromptForAgent(activeAgent.id, locale));
-  const [state, setState] = useState<GenState>("idle");
-  const [rawResponse, setRawResponse] = useState<string | null>(null);
-  const [lastError, setLastError] = useState<StudioErrorState>(null);
-  const payInFlight = useRef(false);
-  const swapWindowOpened = useRef(false);
-
-  const studioInput = getAgentStudioInput(activeAgent.id, prompt, locale);
-  const promptMismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
-
-  useEffect(() => {
-    setPrompt(defaultPromptForAgent(activeAgent.id, locale));
-    setRawResponse(null);
-    setLastError(null);
-    setState("idle");
-  }, [activeAgent.id, locale]);
-
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState !== "visible" || !swapWindowOpened.current) return;
-      swapWindowOpened.current = false;
-      void queryClient.invalidateQueries({ queryKey: walletQueryKey(userId) });
-      toast.success(t("studio.walletRefreshedAfterSwap"));
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [queryClient, t, userId]);
-
-  const extractRequiredAmount = (msg: string): number | undefined => {
-    const match = msg.match(/Cần ([\d.]+)|Required[:\s]+([\d.]+)/i);
-    const raw = match?.[1] ?? match?.[2];
-    if (!raw) return undefined;
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-  };
-
-  const inferSwapUrlFromError = (msg: string): string | undefined => {
-    const direct = msg.match(/https:\/\/app\.uniswap\.org\/swap\?[^\s)]+/i)?.[0];
-    if (direct) return direct;
-    if (/Insufficient|Số dư không đủ|INSUFFICIENT_BALANCE|Content Credits/i.test(msg)) {
-      const needed = extractRequiredAmount(msg) ?? activeAgent.price;
-      return buildUniswapArcSwapUrl({
-        tokenIn: "EURC",
-        tokenOut: "USDC",
-        amount: needed.toFixed(4),
-      });
-    }
-    return undefined;
-  };
-
-  const openSwapThenRetry = (url: string) => {
-    swapWindowOpened.current = true;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const run = async () => {
-    if (studioInput.showPrompt && !prompt.trim()) {
-      toast.error(t("studio.promptEmpty"));
+  const runResearch = async () => {
+    if (inFlight.current) return;
+    if (!prompt.trim()) {
+      setError(vi ? "Hãy nhập câu hỏi nghiên cứu." : "Enter a research question first.");
       return;
     }
-    const mismatch = agentPromptMismatch(activeAgent.id, prompt, locale);
-    if (mismatch.warn && mismatch.message) {
-      toast.warning(t("studio.promptMismatchTitle"), { description: mismatch.message });
-    }
-    if (payInFlight.current) {
+    if (!wallet?.walletId) {
+      setError(vi ? "Ví Circle chưa sẵn sàng. Hãy đăng nhập và mở Wallet." : "Your Circle wallet is not ready. Sign in and open Wallet first.");
       return;
     }
-    payInFlight.current = true;
-    setRawResponse(null);
-    setLastError(null);
-    setState("authorizing");
 
-    const idempotencyKey =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `pay-${Date.now()}`;
-
-    const promptForApi = studioInput.showPrompt ? prompt.trim() : undefined;
-
-    let payment: Awaited<ReturnType<typeof postNanopayment>> | undefined;
+    inFlight.current = true;
+    setLoading(true);
+    setError(null);
+    setResult(null);
     try {
-      if (!wallet?.walletId) {
-        throw new Error(t("studio.walletNotLoaded"));
-      }
-      const prefersArcMainnet = agentRunsOnArcMainnet(activeAgent.id);
-      const prefersArcTestnet = agentRunsOnArcTestnet(activeAgent.id);
-      const chainId = prefersArcMainnet
-        ? ARC_MAINNET_CHAIN_ID
-        : prefersArcTestnet
-          ? (wallet.networks?.arc?.id ?? ARC_CHAIN_ID)
-          : (wallet.preferredChainId ?? wallet.networks?.base?.id ?? BASE_CHAIN_ID);
-      setState("generating");
-      payment = await postNanopayment(
+      const idempotencyKey = crypto.randomUUID();
+      const payment = await postNanopayment(
         wallet.walletId,
-        activeAgent.id,
-        chainId,
-        promptForApi,
+        "arc-research",
+        ARC_MAINNET_CHAIN_ID,
+        prompt.trim(),
         idempotencyKey,
       );
+      const data = readResult(payment);
+      setResult({ data, payment });
       await queryClient.invalidateQueries({ queryKey: walletQueryKey(userId) });
-    } catch (err) {
-      const raw =
-        err instanceof Error && err.message.trim()
-          ? err.message
-          : t("studio.paymentFailedGeneric");
-      const msg = formatNanopaymentError(raw, activeAgent.id, locale);
-      setLastError({ message: msg, swapUrl: inferSwapUrlFromError(msg) });
-      toast.error(t("studio.paymentFailed"), { description: msg });
-      setState("idle");
-      return;
+      toast.success(vi ? "Nghiên cứu hoàn tất" : "Research complete", {
+        description: `${payment.chargedUsdc.toFixed(6)} USDC · Arc Mainnet`,
+      });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(message);
+      toast.error(vi ? "Không thể hoàn tất nghiên cứu" : "Research could not be completed", { description: message });
     } finally {
-      payInFlight.current = false;
+      inFlight.current = false;
+      setLoading(false);
     }
-
-    const body =
-      activeAgent.id === "crypto-research-b"
-        ? payment?.generatedContent?.trim() || payment?.rawResponse?.trim()
-        : payment?.rawResponse?.trim() || payment?.generatedContent?.trim();
-    if (!body) {
-      toast.error(t("studio.paymentNoData"));
-      setState("idle");
-      return;
-    }
-
-    setRawResponse(body);
-    setState("done");
-    const settlement = payment?.onChainSettlementTxId
-      ? t("studio.settlementTx", { id: payment.onChainSettlementTxId.slice(0, 10) })
-      : t("studio.settlementQueued");
-    toast.success(t("studio.charged", { amount: payment?.chargedUsdc ?? activeAgent.price }), {
-      description: payment
-        ? t("studio.chargedDescLedger", {
-            balance: payment.ledgerBalance.toFixed(4),
-            settlement,
-          })
-            : `Paid via x402 on ${settlementNetwork}`,
-    });
   };
 
-  const loading = state === "authorizing" || state === "generating";
-  const settlementNetwork =
-    agentRunsOnArcMainnet(activeAgent.id) || ARC_MAINNET_AGENT_IDS.has(activeAgent.id)
-      ? ARC_MAINNET_NETWORK.name
-      : agentRunsOnArcTestnet(activeAgent.id) || ARC_TESTNET_AGENT_IDS.has(activeAgent.id)
-        ? ARC_NETWORK.name
-        : BASE_NETWORK.name;
-
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
+    <main className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-12">
       <header className="mb-8">
-        <Badge
-          variant="outline"
-          className="border-primary/40 bg-primary/10 font-mono text-[10px] uppercase tracking-[0.2em] text-primary"
-        >
-          {t("studio.badge")}
-        </Badge>
-        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">
-          {t("studio.title")} <span className="text-gradient-neon">{t("studio.titleAccent")}</span>
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-primary">
+          <span className="h-2 w-2 rounded-full bg-success" /> Arc Mainnet · x402
+        </div>
+        <h1 className="font-display text-3xl font-bold tracking-tight md:text-5xl">
+          {vi ? "Arc Research" : "Arc Research"} <span className="text-gradient-neon">Studio</span>
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          {t("studio.subtitle", { baseUrl: activeAgent.baseUrl })}
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground md:text-base">
+          {vi
+            ? "Đặt câu hỏi về crypto hoặc Arc. Dịch vụ tìm kiếm AI của BlockRun lấy thông tin mới từ web và tin tức, trả bản tóm tắt kèm nguồn. App chỉ thanh toán khi API báo giá x402 trên Arc Mainnet."
+            : "Ask about crypto or Arc. BlockRun’s AI search retrieves current web and news information and returns a sourced summary. The app pays only when the API quotes a valid x402 price on Arc Mainnet."}
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <section className="lg:col-span-3">
-          <div className="rounded-xl border border-border/60 bg-gradient-panel p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-md border border-border/60 bg-background/60 font-display text-xl">
-                  {activeAgent.emoji}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold">{activeAgent.name}</div>
-                  <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {activeAgent.handle} ·{" "}
-                  {(activeAgent.baseUrl ?? "x402").replace("https://", "")}
-                  </div>
-                </div>
-              </div>
-              <Badge
-                variant="outline"
-                className="border-primary/30 bg-primary/10 font-mono text-xs text-primary"
-              >
-                {t("studio.x402Dynamic")}
-              </Badge>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.85fr)]">
+        <section className="rounded-2xl border border-border/60 bg-gradient-panel p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
+              <Search className="h-5 w-5" />
             </div>
-
-            {studioInput.showPrompt ? (
-              <div className="space-y-2">
-                <label
-                  htmlFor="studio-prompt"
-                  className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
-                >
-                  {t("studio.promptLabel")}
-                </label>
-                <Textarea
-                  id="studio-prompt"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={7}
-                  className="resize-none border-border/60 bg-background/60 font-mono text-sm"
-                  disabled={loading}
-                />
-                {studioInput.promptHint ? (
-                  <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                    {studioInput.promptHint}
-                  </p>
-                ) : null}
-                {promptMismatch.warn && promptMismatch.message ? (
-                  <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                    {promptMismatch.message}
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-border/60 bg-background/50 px-4 py-4">
-                <div className="mb-2 flex items-center gap-2 text-primary">
-                  <Info className="h-4 w-4 shrink-0" />
-                  <span className="text-sm font-semibold">{activeAgent.name}</span>
-                </div>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {studioInput.agentNote ?? activeAgent.description}
-                </p>
-              </div>
-            )}
-
-            <div className="mt-4 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span className="text-success">●</span>{" "}
-                {t("studio.footerLine", { network: settlementNetwork })}
-              </p>
-              {!wallet?.walletId && !loading ? (
-                <p className="text-xs text-magenta sm:hidden">
-                  {t("studio.walletNotLoaded")}
-                </p>
-              ) : null}
-              <Button
-                size="lg"
-                onClick={run}
-                disabled={loading || !wallet?.walletId}
-                title={!wallet?.walletId ? t("studio.walletNotLoaded") : undefined}
-                className="bg-gradient-neon text-neon-foreground shadow-neon hover:opacity-90 disabled:opacity-50"
-              >
-                {state === "authorizing" && (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("studio.runAuthorizing")}
-                  </>
-                )}
-                {state === "generating" && (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("studio.runFetching")}
-                  </>
-                )}
-                {!loading && (
-                  <>
-                    <Wand2 className="h-4 w-4" />
-                    {t("studio.runIdle")}
-                  </>
-                )}
-              </Button>
+            <div>
+              <h2 className="font-semibold">{vi ? "Câu hỏi nghiên cứu" : "Research question"}</h2>
+              <p className="text-xs text-muted-foreground">BlockRun · Circle Agent Marketplace</p>
             </div>
-            {lastError ? (
-              <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                <p className="text-xs text-amber-200">{lastError.message}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {lastError.swapUrl ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (lastError.swapUrl) openSwapThenRetry(lastError.swapUrl);
-                      }}
-                    >
-                      {t("studio.swapThenRetry")}
-                    </Button>
-                  ) : null}
-                  <Button size="sm" variant="outline" onClick={run} disabled={loading || !wallet?.walletId}>
-                    {t("studio.retryRun")}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2 font-mono text-[10px] uppercase tracking-wider">
-            <StatusPill
-              label={t("studio.statusAuthorize")}
-              active={state === "authorizing"}
-              done={state === "generating" || state === "done"}
-            />
-            <StatusPill
-              label={t("studio.statusFetch")}
-              active={state === "generating"}
-              done={state === "done"}
-            />
-            <StatusPill label={t("studio.statusFormat")} active={false} done={state === "done"} />
+          <Textarea
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            rows={7}
+            maxLength={1000}
+            disabled={loading}
+            placeholder={vi ? "Ví dụ: Những tin tức nào đang ảnh hưởng đến hệ sinh thái Arc?" : "Example: What recent developments are affecting the Arc ecosystem?"}
+            className="resize-y border-border/60 bg-background/60 font-mono text-sm"
+          />
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs leading-5 text-muted-foreground">
+              <span className="font-mono text-success">● ARC MAINNET</span>
+              <span className="mx-2">·</span>
+              {vi ? "Giá lấy trực tiếp từ báo giá 402; số tiền có thể thay đổi theo yêu cầu." : "Price comes from the live 402 quote and may vary by request."}
+            </div>
+            <Button onClick={runResearch} disabled={loading || !wallet?.walletId} className="bg-gradient-neon text-neon-foreground shadow-neon hover:opacity-90">
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {loading ? (vi ? "Đang tìm và thanh toán…" : "Searching and paying…") : (vi ? "Nghiên cứu · trả bằng USDC" : "Research · pay with USDC")}
+            </Button>
           </div>
+          {error ? <p role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
         </section>
 
-        <section className="lg:col-span-2">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {t("thread.previewTitle")}
-            </span>
+        <section className="min-h-72 rounded-2xl border border-border/60 bg-card/70 p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-2 text-primary">
+            <Sparkles className="h-4 w-4" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em]">{vi ? "Báo cáo và nguồn" : "Research and sources"}</span>
           </div>
-          <TweetThreadPreview
-            agentId={activeAgent.id}
-            authorName={activeAgent.name}
-            authorHandle={activeAgent.handle}
-            avatarEmoji={activeAgent.emoji}
-            rawResponse={rawResponse}
-            loading={loading}
-          />
+          {!result && !loading ? (
+            <p className="text-sm leading-6 text-muted-foreground">{vi ? "Kết quả nghiên cứu sẽ xuất hiện ở đây sau khi thanh toán x402 được chấp nhận." : "Your research will appear here after the x402 payment is accepted."}</p>
+          ) : null}
+          {loading ? <p className="text-sm text-muted-foreground">{vi ? "Đang hỏi giá Arc, thanh toán và chờ API trả kết quả…" : "Checking the Arc quote, paying, and waiting for the API response…"}</p> : null}
+          {result ? (
+            <div className="space-y-5">
+              <div className="whitespace-pre-wrap text-sm leading-7">{result.data.summary || result.payment.generatedContent || result.payment.rawResponse}</div>
+              {result.data.citations?.length ? (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{vi ? "Nguồn tham khảo" : "Sources"}</h3>
+                  <ul className="space-y-2">
+                    {result.data.citations.map((citation, index) => (
+                      <li key={`${citation.url}-${index}`}>
+                        <a href={citation.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">
+                          {citation.title || citation.url}<ArrowUpRight className="h-3 w-3" />
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="border-t border-border/60 pt-3 text-xs leading-5 text-muted-foreground">
+                <p>{vi ? "Đã thanh toán" : "Charged"}: <span className="font-mono text-foreground">{result.payment.chargedUsdc.toFixed(6)} USDC</span> · Arc Mainnet</p>
+                {result.payment.providerPaymentTxHash ? (
+                  <a className="mt-1 inline-block text-primary underline-offset-4 hover:underline" href={`https://explorer.arc.io/tx/${result.payment.providerPaymentTxHash}`} target="_blank" rel="noreferrer">
+                    {vi ? "Xem giao dịch thanh toán API" : "View API payment transaction"} <ArrowUpRight className="inline h-3 w-3" />
+                  </a>
+                ) : <p>{vi ? "API chưa trả mã giao dịch để hiển thị." : "The API did not return a transaction hash."}</p>}
+                {result.data.model ? <p>{vi ? "AI tìm kiếm" : "AI search"}: {result.data.model}</p> : null}
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
-    </div>
-  );
-}
-
-function formatNanopaymentError(
-  message: string,
-  agentId: string,
-  locale: import("@/lib/i18n/types").Locale,
-): string {
-  let formatted: string;
-  if (message.includes("Payment settlement failed") && agentId === "perplexity-social") {
-    formatted = formatPaymentErrorForUser(
-      `${message} · Admin: npm run gateway:status (Gateway ≥ 0.012 USDC)`,
-      locale,
-    );
-  } else {
-    formatted = formatPaymentErrorForUser(message, locale);
-  }
-
-  const noRefund =
-    /INSUFFICIENT_BALANCE|Số dư không đủ|Insufficient Content Credits|DUPLICATE_PAYMENT/i.test(
-      message,
-    );
-  if (!noRefund) {
-    formatted += ` ${translate(locale, "studio.creditsRefundedHint")}`;
-  }
-  return formatted;
-}
-
-function StatusPill({ label, active, done }: { label: string; active: boolean; done: boolean }) {
-  return (
-    <div
-      className={`flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 transition-colors ${
-        done
-          ? "border-success/40 bg-success/10 text-success"
-          : active
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : "border-border/60 bg-card/40 text-muted-foreground"
-      }`}
-    >
-      <span>{done ? "✓" : active ? "●" : "○"}</span>
-      {label}
-    </div>
+      <p className="mt-5 text-xs leading-5 text-muted-foreground">
+        {vi
+          ? "Lưu ý: payment x402 của nhà cung cấp và khoản trừ số dư trong app là hai bước riêng. Trang kết quả hiển thị mã giao dịch của API khi nhà cung cấp gửi về; nếu không có mã, không được xem đó là bằng chứng thanh toán on-chain."
+          : "Note: the provider’s x402 payment and the app’s balance debit are separate steps. The result shows the provider transaction hash when supplied; without one, it is not proof of an on-chain payment."}
+      </p>
+    </main>
   );
 }

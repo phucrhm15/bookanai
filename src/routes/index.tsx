@@ -6,11 +6,11 @@ export const Route = createFileRoute("/")({
   component: LandingPage,
   head: () => ({
     meta: [
-      { title: "Nano.Agent — x402 AI agents paid with USDC" },
+      { title: "BookAnAI — Arc Research paid with x402" },
       {
         name: "description",
         content:
-          "Call Surf & Exa via x402, format X threads. Fund Base USDC — no API keys required.",
+          "Research crypto and Arc with AI search, paid per request in USDC on Arc Mainnet.",
       },
     ],
   }),

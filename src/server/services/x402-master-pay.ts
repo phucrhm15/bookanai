@@ -53,6 +53,7 @@ export type X402PayRequestInit = {
 export type X402PayResult = {
   status: number;
   data: unknown;
+  providerPaymentTxHash?: string;
 };
 
 function masterDepositorAddress(): `0x${string}` {
@@ -301,6 +302,29 @@ function parseResponseBody(text: string): unknown {
     return JSON.parse(trimmed) as unknown;
   } catch {
     return trimmed;
+  }
+}
+
+function providerSettlementTxHash(response: Response): string | undefined {
+  const direct = response.headers.get("X-Payment-Receipt") ?? response.headers.get("x-payment-receipt");
+  if (direct && /^0x[\da-f]{64}$/i.test(direct.trim())) return direct.trim();
+
+  const encoded = response.headers.get("PAYMENT-RESPONSE") ?? response.headers.get("payment-response");
+  if (!encoded) return undefined;
+  try {
+    const receipt = JSON.parse(Buffer.from(encoded, "base64").toString("utf8")) as {
+      transaction?: unknown;
+      txHash?: unknown;
+    };
+    const transaction = receipt.txHash ?? receipt.transaction;
+    const hash = typeof transaction === "string"
+      ? transaction
+      : transaction && typeof transaction === "object" && "hash" in transaction
+        ? String((transaction as { hash: unknown }).hash)
+        : "";
+    return /^0x[\da-f]{64}$/i.test(hash) ? hash : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -635,8 +659,21 @@ async function payViaExactEvm(
 
   let response = await doFetch();
 
+  if (chainId === 5042 && response.status !== 402) {
+    throw new CircleServiceError(
+      `Arc x402 endpoint returned HTTP ${response.status} instead of a payment quote; no payment was sent`,
+      "UNSUPPORTED_CHAIN",
+    );
+  }
+
   if (response.status === 402) {
-    const accepts = parsePaymentRequiredAcceptsFromHeader(response);
+    let accepts = parsePaymentRequiredAcceptsFromHeader(response);
+    if (accepts.length === 0) {
+      const body = (await response.clone().json().catch(() => undefined)) as
+        | { accepts?: PaymentRequiredAccept[] }
+        | undefined;
+      accepts = Array.isArray(body?.accepts) ? body.accepts : [];
+    }
     const requiredChainIds = accepts
       .map((a) => chainIdFromEip155(a.network))
       .filter((id): id is number => Number.isFinite(id));
@@ -646,6 +683,27 @@ async function payViaExactEvm(
         "x402 endpoint did not advertise Arc Mainnet (eip155:5042); payment was not sent",
         "UNSUPPORTED_CHAIN",
       );
+    }
+    if (chainId === 5042) {
+      const arcAccept = accepts.find((accept) => accept.network === "eip155:5042");
+      if (
+        !arcAccept ||
+        arcAccept.asset?.toLowerCase() !== ARC_MAINNET_USDC_CONTRACT_ADDRESS.toLowerCase() ||
+        !arcAccept.amount || !/^\d+$/.test(arcAccept.amount)
+      ) {
+        throw new CircleServiceError(
+          "Arc x402 quote is missing or does not specify native USDC on Arc Mainnet; payment was not sent",
+          "UNSUPPORTED_CHAIN",
+        );
+      }
+      const quotedAtomicUsdc = BigInt(arcAccept.amount);
+      const probedAtomicUsdc = BigInt(Math.round(minUsdc * 1_000_000));
+      if (quotedAtomicUsdc !== probedAtomicUsdc) {
+        throw new CircleServiceError(
+          "Arc x402 price changed after the balance check. No payment was sent; please retry for a fresh quote.",
+          "DUPLICATE_PAYMENT",
+        );
+      }
     }
     const extraFallbacks = chainId === 5042 ? [] : [8453, 137];
     const candidateChains =
@@ -698,7 +756,11 @@ async function payViaExactEvm(
     );
   }
 
-  return { status: response.status, data };
+  return {
+    status: response.status,
+    data,
+    providerPaymentTxHash: providerSettlementTxHash(response),
+  };
 }
 
 /**

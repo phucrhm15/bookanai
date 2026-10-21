@@ -5,8 +5,8 @@ export const Route = createFileRoute("/_app/studio")({
   component: Studio,
   head: () => ({
     meta: [
-      { title: "Studio · Nano.Agent" },
-      { name: "description", content: "Generate content with your selected AI agent — paid per prompt in USDC." },
+      { title: "Arc Research Studio · BookAnAI" },
+      { name: "description", content: "Research crypto and Arc with a cited AI report, paid per request in USDC on Arc Mainnet." },
     ],
   }),
 });

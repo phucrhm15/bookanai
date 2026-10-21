@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Store, Sparkles, Wallet } from "lucide-react";
+import { Sparkles, Wallet } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,8 +21,7 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const items = [
-    { title: t("nav.marketplace"), url: "/marketplace", icon: Store },
-    { title: t("nav.studio"), url: "/studio", icon: Sparkles },
+    { title: "Arc Research", url: "/studio", icon: Sparkles },
     { title: t("nav.wallet"), url: "/wallet", icon: Wallet },
   ];
   const isActive = (url: string) => pathname === url || pathname.startsWith(`${url}/`);
@@ -30,16 +29,16 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/marketplace" className="flex items-center gap-2 px-2 py-3">
+        <Link to="/studio" className="flex items-center gap-2 px-2 py-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-neon text-neon-foreground font-bold text-lg shadow-neon">
             N
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
             <div className="font-display text-sm font-bold tracking-wide">
-              NANO<span className="text-gradient-neon">.AGENT</span>
+              BOOK<span className="text-gradient-neon">ANAI</span>
             </div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {t("nav.web3Studio")}
+              Arc Mainnet Research
             </div>
           </div>
         </Link>

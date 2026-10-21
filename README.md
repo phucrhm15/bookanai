@@ -3,21 +3,21 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)](package.json)
 
-Open-source web studio: users sign in with **Clerk**, top up **USDC (Base)**, run **x402 AI agents** (Messari, Perplexity, Surf), and preview **X threads**. Built with **TanStack Start**, **Circle** embedded wallets, and **Circle Gateway** batching.
+Open-source Arc research app: users sign in with **Clerk**, fund a Circle wallet with **USDC on Arc Mainnet**, and pay for live AI web/news research through **x402**. The service uses a live provider quote and returns a sourced answer. Built with **TanStack Start**, **Circle Programmable Wallets**, and a SQLite ledger.
 
 **Live demo:** https://bookanai.onrender.com  
 **Repo:** https://github.com/phucrhm15/bookanai
 
 ---
 
-Ứng dụng web cho phép **nhiều user** đăng ký (Clerk), nạp **USDC trên Base**, gọi agent **Messari** / **Perplexity** / **Surf** qua **x402**, và xem preview thread X.
+Ứng dụng nghiên cứu crypto cho phép user đăng nhập bằng **Clerk**, nạp **USDC trên Arc Mainnet**, rồi gọi API tìm kiếm AI có trả phí qua **x402**. Giá được lấy trực tiếp từ báo giá của nhà cung cấp và câu trả lời có kèm nguồn.
 
 ## Tính năng
 
 - **Landing** công khai tại `/`
-- **Marketplace / Studio / Wallet** sau đăng nhập
-- Ví embedded **Circle** mỗi user
-- Thanh toán **x402** (giá động từ HTTP 402)
+- **Arc Research Studio / Wallet** sau đăng nhập
+- Ví **Circle** cho mỗi user
+- Thanh toán x402 theo báo giá động HTTP 402 trên Arc Mainnet
 - Ledger SQLite (lịch sử giao dịch)
 - **Circle App Kit** — Gateway deposit, bridge, withdraw, swap (`@circle-fin/app-kit` + DCW adapter)
 
@@ -27,9 +27,9 @@ Open-source web studio: users sign in with **Clerk**, top up **USDC (Base)**, ru
 |---------|----------|
 | [Clerk](https://clerk.com) | Đăng ký / đăng nhập user |
 | [Circle](https://developers.circle.com) | API key, entity secret, wallet set |
-| Ví **Master** (`MASTER_AGENT_PRIVATE_KEY`) | Trả API x402 — **Gateway USDC + gas theo chain agent** (Base: Messari; **Polygon: Surf**) |
+| Ví thanh toán dịch vụ (`MASTER_AGENT_PRIVATE_KEY`) | Ký khoản thanh toán x402 cho nhà cung cấp trên Arc Mainnet; cần USDC và gas bằng USDC trên Arc |
 | `CIRCLE_KIT_KEY` (tùy chọn) | Bật **Swap** trong App Kit trên trang Wallet |
-| RPC | `BASE_RPC_URL`, `POLYGON_RPC_URL` (**HTTPS only**, not `wss://`) |
+| RPC | `ARC_MAINNET_RPC_URL` (**HTTPS only**) |
 
 ## Cài đặt local (dev)
 
@@ -50,25 +50,15 @@ Mở http://localhost:8080 (hoặc port Vite in ra).
 ### User mới (end user)
 
 1. Vào `/` → **Bắt đầu miễn phí** (Clerk sign-up)
-2. **Wallet & Billing** → copy địa chỉ ví → nạp **USDC Base**
-3. **Marketplace** → chọn agent → **Studio** → Run Agent
-
-| Agent | Prompt phù hợp | Giá x402 (ước) | Chain |
-|-------|----------------|----------------|-------|
-| Perplexity Search Writer | Tin vĩ mô, chính trị | ~0.012 USDC | Base |
-| Messari Token Analyst | Giá / ATH BTC, ETH | ~0.1 USDC | Base |
-| Surf Tokenomics | Tokenomics + unlock | ~0.002 USDC | Polygon Gateway |
+2. **Wallet** → copy địa chỉ ví → nạp **USDC trên Arc Mainnet**
+3. Mở **Arc Research**, nhập câu hỏi → bấm **Run Agent**. App lấy báo giá x402 mới nhất rồi gọi dịch vụ tìm kiếm AI và trả về phần tóm tắt cùng nguồn.
 
 ### Vận hành Master (admin)
 
 ```bash
-npm run show:x402          # địa chỉ nạp USDC + ETH cho x402
-npm run gateway:status
-npm run gateway:deposit -- 0.05 base
-npm run gateway:deposit -- 0.05 polygon   # Surf — cần MATIC gas
-npm run gateway:status -- polygon
+npm run show:x402          # địa chỉ ví thanh toán x402
 npm run health
-npm run cron:settle        # chuyển user→master on-chain (hoặc cron HTTP)
+npm run cron:settle        # xử lý các khoản user→master đang chờ settlement
 ```
 
 `GET /api/master/status` và `GET /api/debug/x402` — cần header `Authorization: Bearer <SETTLEMENT_CRON_SECRET>` trên production (operator only).

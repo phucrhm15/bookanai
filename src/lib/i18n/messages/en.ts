@@ -110,7 +110,7 @@ export const en = {
     },
     loneStarNews: {
       description:
-        "AI crypto and macro headline sentiment with bullish/bearish distribution. Direct x402 payment on Arc Mainnet, about 0.05 USDC per call.",
+        "AI crypto and macro headline sentiment with bullish/bearish distribution. x402 payment on Base, about 0.05 USDC per call.",
       category: "Crypto Sentiment",
     },
   },
@@ -119,7 +119,7 @@ export const en = {
     title: "Data & search",
     titleAccent: "→ X thread",
     subtitle:
-      "Call x402 APIs ({{baseUrl}}), format JSON into an X thread — pay USDC via Circle Gateway.",
+      "Call x402 APIs ({{baseUrl}}), format JSON into an X thread — pay USDC with x402.",
     x402Dynamic: "x402 dynamic USDC",
     statusAuthorize: "x402 Authorize",
     statusFetch: "API Fetch",
@@ -359,7 +359,7 @@ export const en = {
     arcSonarFull:
       "Arc Sonar Brief sends your prompt to Perplexity Sonar via x402. Prefer questions about Arc, USDC gas, or Circle stablecoin rails.",
     loneStarNewsFull:
-      "LoneStarOracle returns a crypto/news sentiment signal and supporting headlines. Ask about a token or market move; the quote is confirmed by x402 before payment. Keep enough USDC on Arc Mainnet for settlement.",
+      "LoneStarOracle returns a crypto/news sentiment signal and supporting headlines. Ask about a token or market topic; the quote is confirmed by x402 before payment. Keep enough USDC on Base for settlement.",
   },
   meta: {
     homeTitle: "Nano.Agent — x402 AI agents paid with USDC",

@@ -11,7 +11,7 @@ import {
   reserveOnchainSettlement,
 } from "@/server/services/onchain-settlement";
 import { executeUserToMasterTransfer } from "@/server/services/usdc-transfer";
-import { getUnifiedBalance } from "@/services/circleService";
+import { getUnifiedBalance, getUsdcBalanceForChain } from "@/services/circleService";
 import { CircleServiceError } from "@/services/circle-errors";
 
 export type CollectUserUsdcResult = {
@@ -39,14 +39,17 @@ export async function collectUserUsdcForX402(params: {
   }
 
   const unified = await getUnifiedBalance(userWalletId);
-  const holdBefore = getOnchainSettlementHoldUsdc(clerkId);
-  const spendableOnChain = Math.max(0, unified.totalUsdc - holdBefore);
+  const chainBalance = getUsdcBalanceForChain(unified, targetChainId);
+  const holdBefore = getOnchainSettlementHoldUsdc(clerkId, targetChainId);
+  const spendableOnChain = Math.max(0, chainBalance - holdBefore);
   const epsilon = 0.000_001;
 
   if (amountUsdc > spendableOnChain + epsilon) {
     throw new CircleServiceError(
-      `Ví on-chain không đủ USDC để chi trả API (cần ${amountUsdc.toFixed(6)}, khả dụng ${spendableOnChain.toFixed(6)}). ` +
-        `Nạp USDC Base vào ví Content Credits.`,
+      `USDC trên chain thanh toán ${targetChainId} không đủ để trả API ` +
+        `(cần ${amountUsdc.toFixed(6)}, khả dụng ${spendableOnChain.toFixed(6)}, ` +
+        `số dư chain ${chainBalance.toFixed(6)}, đang giữ ${holdBefore.toFixed(6)}). ` +
+        `Nạp USDC đúng chain ${targetChainId} vào ví Content Credits.`,
       "INSUFFICIENT_BALANCE",
     );
   }

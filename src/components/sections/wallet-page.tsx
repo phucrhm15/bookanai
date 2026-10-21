@@ -10,7 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ARC_NETWORK, BASE_NETWORK } from "@/lib/mock-data";
+import { ARC_NETWORK, BASE_NETWORK } from "@/lib/chains";
 import { useWallet } from "@/hooks/use-wallet";
 import {
   AlertTriangle,

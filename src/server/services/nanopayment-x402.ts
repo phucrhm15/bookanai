@@ -9,7 +9,13 @@
  *
  * On failure before user on-chain transfer: SQLite refund.
  */
-import { isSupportedChainId, type SupportedChainId } from "@/lib/chains";
+import {
+  BASE_CHAIN_ID,
+  DCW_BLOCKCHAIN_BASE,
+  isSupportedChainId,
+  type SupportedChainId,
+} from "@/lib/chains";
+import { dcwBlockchainsForApiKey } from "@/lib/circle-dcw-blockchains";
 import { resolveAgentPaymentChain, arcTestnetGatewayReady } from "@/lib/arc-agent-network";
 import { buildArcNanopaymentMemo, isArcChain } from "@/lib/arc-transaction-extensions";
 import { probeX402ResourcePrice } from "@/lib/x402-probe";
@@ -19,13 +25,13 @@ import {
   circleRuntimeReady,
   ensureClerkUserWalletSynced,
   getUnifiedBalance,
+  getUsdcBalanceForChain,
   settleWithMasterAgentBounded,
   type NanopaymentResult,
 } from "@/services/circleService";
 import { CircleServiceError } from "@/services/circle-errors";
 import {
   resolveAgentResource,
-  STUDIO_AGENT_FALLBACK_PRICE_USDC,
   agentUsesGatewayPolygonPay,
   agentPrefersArcMainnet,
 } from "@/services/agent-service-map";
@@ -36,13 +42,10 @@ import {
   processSettlementBatchForUser,
   reserveOnchainSettlement,
   syncWalletCreditsForUser,
+  getOnchainSettlementHoldUsdc,
 } from "@/server/services/onchain-settlement";
 import { collectUserUsdcForX402 } from "@/server/services/user-x402-prefund";
 import { userStore, UserStoreError } from "@/server/storage/user-store";
-import {
-  processResearchStackB,
-  RESEARCH_STACK_B_AGENT_ID,
-} from "@/server/services/research-stack-b";
 
 const INSUFFICIENT_MSG = "Số dư không đủ để thanh toán cho Agent này";
 
@@ -75,66 +78,18 @@ export function payOptionsForAgent(
   agentServiceId: string,
   prompt?: string,
 ): { method?: "GET" | "POST"; headers?: Record<string, string>; body?: unknown } | undefined {
-  if (agentServiceId === "perplexity-social" && prompt?.trim()) {
+  if (agentServiceId === "arc-research" && prompt?.trim()) {
     return {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: {
         query: prompt.trim(),
-        type: "auto",
-        numResults: 8,
-        contents: { text: { maxCharacters: 800 }, highlights: { numSentences: 2 } },
+        sources: ["web", "news"],
+        max_results: 8,
       },
     };
   }
-  if (agentServiceId === "surf-news") {
-    return { method: "GET", headers: { Accept: "application/json" } };
-  }
-  if (agentServiceId === "arc-market-pulse") {
-    return { method: "GET", headers: { Accept: "application/json" } };
-  }
-  if (agentServiceId === "arc-sonar-brief") {
-    const q =
-      prompt?.trim() ||
-      "Explain why USDC as native gas on Arc blockchain matters for autonomous AI agents and nanopayments.";
-    return {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: { query: q },
-    };
-  }
-  // Arc Mainnet agents
-  if (agentServiceId === "arc-defi-oracle" || agentServiceId === "arc-mainnet-pulse") {
-    return { method: "GET", headers: { Accept: "application/json" } };
-  }
-  if (agentServiceId === "arc-chain-analytics") {
-    const q =
-      prompt?.trim() ||
-      "Analyze Arc Mainnet on-chain activity: USDC flows, top contracts, bridge volume from CCTP.";
-    return {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: { query: q },
-    };
-  }
-  if (agentServiceId === "lonestar-crypto-news") {
-    return { method: "GET", headers: { Accept: "application/json" } };
-  }
   return undefined;
-}
-
-/** Append agent-specific query params to the resolved x402 resource URL. */
-export function withAgentResourceQuery(
-  agentServiceId: string,
-  resourceUrl: string,
-  _prompt?: string,
-): string {
-  if (agentServiceId === "lonestar-crypto-news" && _prompt?.trim()) {
-    const url = new URL(resourceUrl);
-    url.searchParams.set("query", _prompt.trim());
-    return url.toString();
-  }
-  return resourceUrl;
 }
 
 export async function processNanopaymentX402(
@@ -156,11 +111,19 @@ export async function processNanopaymentX402(
     throw new CircleServiceError(`Unsupported targetChainId ${targetChainId}`, "UNSUPPORTED_CHAIN");
   }
 
-  if (agentServiceId === "lonestar-crypto-news" && !prompt?.trim()) {
+  if (agentServiceId !== "arc-research") {
     throw new CircleServiceError(
-      "Hãy nhập token hoặc chủ đề cần phân tích trước khi chạy LoneStarOracle.",
+      "Studio này chỉ hỗ trợ Arc Research qua Circle Agent Marketplace.",
       "INVALID_REQUEST",
     );
+  }
+
+  if (targetChainId !== 5042) {
+    throw new CircleServiceError("Arc Research chỉ thanh toán trên Arc Mainnet (eip155:5042).", "UNSUPPORTED_CHAIN");
+  }
+
+  if (!prompt?.trim() || prompt.trim().length > 1000) {
+    throw new CircleServiceError("Câu hỏi nghiên cứu phải có từ 1 đến 1000 ký tự.", "INVALID_REQUEST");
   }
 
   let paymentChainId = targetChainId as SupportedChainId;
@@ -173,13 +136,10 @@ export async function processNanopaymentX402(
   await ensureClerkUserWalletSynced(clerkId);
   userStore.requireByClerkId(clerkId);
 
-  if (agentServiceId === RESEARCH_STACK_B_AGENT_ID) {
-    return processResearchStackB(clerkId, userWalletId, paymentChainId, prompt, idempotencyKey);
-  }
-
   const { resourceUrl: mappedUrl, discoveryItem } = await resolveAgentResource(agentServiceId);
+  const circleApiKey = (await import("@/server/config/env")).getServerEnv().CIRCLE_API_KEY;
   const resolvedChain = resolveAgentPaymentChain({
-    apiKey: (await import("@/server/config/env")).getServerEnv().CIRCLE_API_KEY,
+    apiKey: circleApiKey,
     agentServiceId,
     accepts: discoveryItem.accepts,
     requestedChainId: paymentChainId,
@@ -193,7 +153,17 @@ export async function processNanopaymentX402(
     paymentChainId = resolvedChain;
   }
 
-  const resourceUrl = withAgentResourceQuery(agentServiceId, mappedUrl, prompt);
+  if (
+    paymentChainId === BASE_CHAIN_ID &&
+    !dcwBlockchainsForApiKey(circleApiKey).includes(DCW_BLOCKCHAIN_BASE)
+  ) {
+    throw new CircleServiceError(
+      `This agent requires Base (eip155:8453), but the current Circle TEST wallet cannot settle Base payments. Switch to a LIVE Circle wallet with USDC on Base. No payment was sent for ${agentServiceId}.`,
+      "UNSUPPORTED_CHAIN",
+    );
+  }
+
+  const resourceUrl = mappedUrl;
   console.info(`[x402] Discovery resource for ${agentServiceId}: ${resourceUrl}`);
 
   const payOptions = payOptionsForAgent(agentServiceId, prompt);
@@ -205,26 +175,29 @@ export async function processNanopaymentX402(
       }
     : undefined;
 
-  let probe;
-  try {
-    probe = await probeX402ResourcePrice(
-      resourceUrl,
-      paymentChainId,
-      discoveryItem.accepts,
-      probeInit,
-    );
-  } catch (probeError) {
-    const fallback = STUDIO_AGENT_FALLBACK_PRICE_USDC[agentServiceId];
-    if (fallback == null) throw probeError;
-    console.warn(`[x402] Probe fallback for ${agentServiceId}: ${fallback} USDC`, probeError);
-    probe = { status: 402, paymentRequired: true, priceUsdc: fallback };
-  }
+  const probe = await probeX402ResourcePrice(
+    resourceUrl,
+    paymentChainId,
+    discoveryItem.accepts,
+    probeInit,
+  );
   const agentPriceUsdc = probe.priceUsdc;
+  if (!probe.paymentRequired || probe.status !== 402) {
+    throw new CircleServiceError(
+      "The Arc provider did not return a live HTTP 402 quote. No payment was sent.",
+      "UNSUPPORTED_CHAIN",
+    );
+  }
   console.info(`[x402] Dynamic agent price: ${agentPriceUsdc} USDC (HTTP ${probe.status})`);
 
+  const balanceBeforeSync = await getUnifiedBalance(userWalletId);
+  await syncWalletCreditsForUser(clerkId, balanceBeforeSync.totalUsdc);
+  // Settlement processing above can move USDC, so base the payment check on a fresh chain snapshot.
   const unified = await getUnifiedBalance(userWalletId);
   const credits = await syncWalletCreditsForUser(clerkId, unified.totalUsdc);
-  const spendable = credits.spendableCreditsUsdc;
+  const chainBalance = getUsdcBalanceForChain(unified, paymentChainId);
+  const chainHoldUsdc = getOnchainSettlementHoldUsdc(clerkId, paymentChainId);
+  const spendable = Math.min(credits.ledgerBalance, Math.max(0, chainBalance - chainHoldUsdc));
 
   if (spendable < agentPriceUsdc) {
     const arcHint = agentUsesGatewayPolygonPay(agentServiceId)
@@ -234,9 +207,9 @@ export async function processNanopaymentX402(
         : "";
     throw new CircleServiceError(
       `${INSUFFICIENT_MSG}. Cần ${agentPriceUsdc} USDC, khả dụng ${spendable.toFixed(6)} USDC ` +
-        `(ledger ${credits.ledgerBalance.toFixed(6)}, ví on-chain ${unified.totalUsdc.toFixed(6)}, ` +
-        `đang giữ chuyển ${credits.holdUsdc.toFixed(6)}). ` +
-        `Nạp USDC Base vào ví Content Credits hoặc mở Wallet để đồng bộ.${arcHint}`,
+        `(ledger ${credits.ledgerBalance.toFixed(6)}, USDC chain ${paymentChainId} ${chainBalance.toFixed(6)}, ` +
+        `đang giữ trên chain này ${chainHoldUsdc.toFixed(6)}). ` +
+        `Nạp USDC trên chain ${paymentChainId} vào ví Content Credits hoặc mở Wallet để đồng bộ.${arcHint}`,
       "INSUFFICIENT_BALANCE",
     );
   }
@@ -375,6 +348,7 @@ export async function processNanopaymentX402(
       unifiedBalance: refreshed.totalUsdc,
       responseStatus: httpStatus,
       responsePreview: bodyText.slice(0, 2000),
+      providerPaymentTxHash: response.providerPaymentTxHash,
       rawResponse: bodyText,
       generatedContent: extractX402MarketplaceContent(bodyText),
       paymentRequiredObserved: probe.paymentRequired,

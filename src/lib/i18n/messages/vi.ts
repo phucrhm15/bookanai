@@ -96,7 +96,7 @@ export const vi: typeof en = {
     },
     loneStarNews: {
       description:
-        "Tổng hợp sentiment từ headline crypto và vĩ mô, kèm phân bổ bullish/bearish. Thanh toán x402 trực tiếp trên Arc Mainnet, khoảng 0,05 USDC/lần.",
+        "Tổng hợp sentiment từ headline crypto và vĩ mô, kèm phân bổ bullish/bearish. Thanh toán x402 trên Base, khoảng 0,05 USDC/lần.",
       category: "Sentiment Crypto",
     },
   },
@@ -105,7 +105,7 @@ export const vi: typeof en = {
     title: "Data & search",
     titleAccent: "→ thread X",
     subtitle:
-      "Gọi API x402 ({{baseUrl}}), định dạng JSON thành thread X — thanh toán USDC qua Circle Gateway.",
+      "Gọi API x402 ({{baseUrl}}), định dạng JSON thành thread X — thanh toán USDC bằng x402.",
     x402Dynamic: "x402 dynamic USDC",
     statusAuthorize: "Xác thực x402",
     statusFetch: "Gọi API",
@@ -344,7 +344,7 @@ export const vi: typeof en = {
     arcSonarFull:
       "Arc Sonar Brief gửi prompt tới Perplexity Sonar qua x402. Nên hỏi về Arc, gas USDC hoặc hạ tầng stablecoin Circle.",
     loneStarNewsFull:
-      "LoneStarOracle trả tín hiệu sentiment crypto/tin tức và các headline liên quan. Hỏi về token hoặc biến động thị trường; giá được x402 xác nhận trước khi thanh toán. Cần có đủ USDC trên Arc Mainnet để settlement.",
+      "LoneStarOracle trả tín hiệu sentiment crypto/tin tức và các headline liên quan. Hỏi về token hoặc chủ đề thị trường; giá được x402 xác nhận trước khi thanh toán. Cần có đủ USDC trên Base để thanh toán.",
   },
   meta: {
     homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",

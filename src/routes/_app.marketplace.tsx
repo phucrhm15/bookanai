@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Marketplace } from "@/components/sections/marketplace";
+import { redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/marketplace")({
-  component: Marketplace,
+  beforeLoad: () => {
+    throw redirect({ to: "/studio" });
+  },
   head: () => ({
     meta: [
       { title: "Marketplace · Nano.Agent" },

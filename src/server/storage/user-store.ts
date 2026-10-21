@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
-import type { Transaction } from "@/lib/mock-data";
+import type { WalletTransaction } from "@/lib/transaction-types";
 import { getDb, withImmediateTransaction } from "@/server/db/client";
 import { ledgerEntries, users } from "@/server/db/schema";
 import { microToUsdc, usdcToMicro } from "@/server/db/usdc";
@@ -15,7 +15,7 @@ export type UserRecord = {
   circleWalletId: string;
   address: string;
   ledgerBalance: number;
-  transactions: Transaction[];
+  transactions: WalletTransaction[];
 };
 
 export type DebitResult = {
@@ -40,7 +40,7 @@ const TX_HISTORY_LIMIT = 100;
 
 function rowToUserRecord(
   row: typeof users.$inferSelect,
-  transactions: Transaction[],
+  transactions: WalletTransaction[],
 ): UserRecord {
   return {
     userId: row.userId,
@@ -51,7 +51,7 @@ function rowToUserRecord(
   };
 }
 
-function fetchLedgerHistory(clerkId: ClerkId): Transaction[] {
+function fetchLedgerHistory(clerkId: ClerkId): WalletTransaction[] {
   const db = getDb();
   const rows = db
     .select()

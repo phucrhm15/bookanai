@@ -1,5 +1,9 @@
-import { ARC_NETWORK, BASE_NETWORK, USDC_CONTRACT_ADDRESS } from "@/lib/mock-data";
-import { formatPaymentErrorForUser } from "@/lib/payment-error-messages";
+import {
+  ARC_MAINNET_NETWORK,
+  ARC_NETWORK,
+  BASE_NETWORK,
+  ARC_MAINNET_USDC_CONTRACT_ADDRESS,
+} from "@/lib/chains";
 import type { UnifiedBalanceSnapshot } from "@/lib/wallet-types";
 
 export type WalletNetworkInfo = {
@@ -23,8 +27,9 @@ export type WalletApiResponse = {
   networks?: {
     base: WalletNetworkInfo;
     arc: WalletNetworkInfo;
+    arcMainnet?: WalletNetworkInfo;
   };
-  network: typeof ARC_NETWORK;
+  network: typeof ARC_NETWORK | typeof ARC_MAINNET_NETWORK | typeof BASE_NETWORK;
   preferredChainId?: number;
   transactions: {
     id: string;
@@ -48,6 +53,7 @@ export type NanopaymentApiResponse = {
   rawResponse: string;
   generatedContent: string;
   paymentRequiredObserved?: boolean;
+  providerPaymentTxHash?: string;
   onChainSettlementTxId?: string;
   onChainSettlementQueuedId?: string;
   arcOnChainMemo?: {
@@ -125,9 +131,15 @@ export async function postNanopayment(
       err?.error ??
       err?.message ??
       (res.statusText ? `${res.statusText} (HTTP ${res.status})` : `HTTP ${res.status}`);
-    throw new Error(formatPaymentErrorForUser(message));
+    // Keep the backend's raw message/code context; Studio formats it once using the active locale.
+    throw new Error(message);
   }
   return res.json() as Promise<NanopaymentApiResponse>;
 }
 
-export { USDC_CONTRACT_ADDRESS, BASE_NETWORK, ARC_NETWORK };
+export {
+  ARC_MAINNET_NETWORK,
+  ARC_NETWORK,
+  BASE_NETWORK,
+  ARC_MAINNET_USDC_CONTRACT_ADDRESS as USDC_CONTRACT_ADDRESS,
+};

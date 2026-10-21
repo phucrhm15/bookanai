@@ -21,38 +21,12 @@ type DiscoveryResponse = {
  * Each URL must be payable via x402 (HTTP 402 + USDC) at resolve time.
  */
 export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
-  /** Exa web search — AIsa Perplexity removed from Circle Discovery (2026) */
-  "perplexity-social": "https://api.exa.ai/search",
-  /** Polymarket crypto prediction market odds — replaces retired Surf feed (410 since 2026-09-10) */
-  "surf-news": "https://nano.blockrun.ai/api/v1/pm/polymarket/crypto-updown",
-  /** Orchestrated multi-API workflow — probe uses Exa entry point */
-  "crypto-research-b": "https://api.exa.ai/search",
-  /** Arc Testnet agents — Circle Discovery AIsa resources (pay Base today; settle Arc on TEST keys) */
-  "arc-market-pulse": "https://api.aisa.one/apis/v2/coingecko/search/trending",
-  "arc-sonar-brief": "https://api.aisa.one/apis/v2/perplexity/sonar",
-  /** Arc Mainnet agents — real USDC, chain 5042. Same AIsa x402 endpoints, settled on Arc Mainnet. */
-  "arc-defi-oracle": "https://api.aisa.one/apis/v2/coingecko/search/trending",
-  "arc-mainnet-pulse": "https://api.aisa.one/apis/v2/coingecko/search/trending",
-  "arc-chain-analytics": "https://api.aisa.one/apis/v2/perplexity/sonar",
-  /** LoneStarOracle AI crypto/news sentiment — x402 Exact on Arc Mainnet */
-  "lonestar-crypto-news": "https://news.lonestaroracle.xyz/news",
-};
-
-/** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
-export const STUDIO_AGENT_FALLBACK_PRICE_USDC: Partial<Record<string, number>> = {
-  "perplexity-social": 0.007,
-  "surf-news": 0.001, // Polymarket crypto-updown (nano.blockrun.ai)
-  "crypto-research-b": 0.11,
-  "arc-market-pulse": 0.008,
-  "arc-sonar-brief": 0.008,
-  // Arc Mainnet agents — real USDC fallback prices
-  "arc-defi-oracle": 0.012,
-  "arc-mainnet-pulse": 0.015,
-  "arc-chain-analytics": 0.02,
+  /** BlockRun Arc gateway: live AI web/news search, settled with x402 on Arc Mainnet. */
+  "arc-research": "https://arc.blockrun.ai/api/v1/search",
 };
 
 /** Surf pays via Circle GatewayWalletBatched on Polygon — not Base exact x402. */
-export const GATEWAY_POLYGON_AGENT_IDS = new Set(["surf-news"]);
+export const GATEWAY_POLYGON_AGENT_IDS = new Set<string>();
 
 /** Re-export Arc agent gateways */
 export {
@@ -71,12 +45,7 @@ export function agentUsesGatewayPolygonPay(agentServiceId: string): boolean {
 
 /** Hosts with native x402 not yet mirrored in Circle Discovery catalog */
 const DIRECT_X402_HOSTS = new Set([
-  "nano.blockrun.ai",
-  "api.exa.ai",
-  "api.aisa.one",
-  "api.vaults.fyi",
-  "api.itsgloria.ai",
-  "news.lonestaroracle.xyz",
+  "arc.blockrun.ai",
 ]);
 
 /** All HTTPS hosts from STUDIO_AGENT_RESOURCES (+ DIRECT_X402_HOSTS). */

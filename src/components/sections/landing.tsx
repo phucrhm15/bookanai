@@ -1,18 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@clerk/tanstack-react-start";
-import { ArrowRight, Sparkles, Store, Wallet, Zap, Layers } from "lucide-react";
-import { getLocalizedAgents } from "@/lib/agents-localized";
+import { ArrowRight, Sparkles, Wallet, Zap, Layers, Search } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/locale-context";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AuthControls } from "@/components/auth-controls";
-import { cn } from "@/lib/utils";
 
 export function Landing() {
   const { isLoaded, isSignedIn } = useAuth();
   const { t, locale } = useTranslation();
-  const agents = getLocalizedAgents(locale);
+  const vi = locale === "vi";
 
   return (
     <div className="min-h-screen grid-bg text-foreground">
@@ -24,10 +22,10 @@ export function Landing() {
             </div>
             <div>
               <div className="font-display text-sm font-bold tracking-wide">
-                NANO<span className="text-gradient-neon">.AGENT</span>
+                BOOK<span className="text-gradient-neon">ANAI</span>
               </div>
               <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                x402 · Base + Arc Mainnet
+                x402 · Arc Mainnet
               </div>
             </div>
           </Link>
@@ -46,7 +44,7 @@ export function Landing() {
             ) : null}
             {isLoaded && isSignedIn ? (
               <Button asChild size="sm" className="bg-gradient-neon text-neon-foreground shadow-neon">
-                <Link to="/marketplace">
+                <Link to="/studio">
                   {t("landing.ctaOpenApp")}
                   <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
@@ -87,7 +85,7 @@ export function Landing() {
             {isLoaded && isSignedIn ? (
               <>
                 <Button asChild size="lg" className="bg-gradient-neon text-neon-foreground shadow-neon">
-                  <Link to="/marketplace">{t("landing.ctaMarketplace")}</Link>
+                  <Link to="/studio">{vi ? "Mở Arc Research" : "Open Arc Research"}</Link>
                 </Button>
                 <Button asChild size="lg" variant="outline">
                   <Link to="/wallet">{t("landing.ctaTopUp")}</Link>
@@ -100,74 +98,56 @@ export function Landing() {
         <section className="border-y border-border/60 bg-card/30 py-16">
           <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-2 lg:grid-cols-4 md:px-6">
             <Feature
-              icon={Store}
-              title={t("landing.featureMarketplaceTitle")}
-              text={t("landing.featureMarketplaceText")}
-            />
-            <Feature
               icon={Sparkles}
-              title={t("landing.featureStudioTitle")}
-              text={t("landing.featureStudioText")}
+              title={vi ? "Nghiên cứu bằng AI" : "AI-powered research"}
+              text={vi ? "Tìm tin web và tin tức mới, trả về tóm tắt có nguồn." : "Search current web and news, then return a sourced summary."}
             />
             <Feature
               icon={Wallet}
-              title={t("landing.featureWalletTitle")}
-              text={t("landing.featureWalletText")}
+              title={vi ? "Thanh toán theo lượt" : "Pay per request"}
+              text={vi ? "Giá lấy từ báo giá x402 thật trước khi thanh toán." : "The app reads the provider’s live x402 quote before payment."}
             />
             <Feature
               icon={Layers}
-              title={t("landing.featureArcTitle")}
-              text={t("landing.featureArcText")}
+              title="Arc Mainnet"
+              text={vi ? "USDC được thanh toán trực tiếp trên Arc Mainnet." : "USDC payment settles on Arc Mainnet."}
               highlight
+            />
+            <Feature
+              icon={Search}
+              title={vi ? "Nguồn minh bạch" : "Sources included"}
+              text={vi ? "Mở nguồn tham khảo và mã giao dịch ngay trong kết quả." : "Open source links and the provider transaction receipt from the result."}
             />
           </div>
         </section>
 
         <section className="mx-auto max-w-6xl px-4 py-16 md:px-6">
-          <h2 className="font-display text-2xl font-bold">{t("landing.agentsTitle")}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{t("landing.agentsHint")}</p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {agents.map((agent) => {
-              const isArcMainnet = agent.network === "arc";
-              const isArcTestnet = agent.network === "arc-testnet";
-              return (
-                <article
-                  key={agent.id}
-                  className={cn(
-                    "rounded-xl border bg-gradient-panel p-5 transition-colors",
-                    isArcMainnet
-                      ? "border-yellow-400/30 hover:border-yellow-400/50"
-                      : "border-border/60 hover:border-primary/40",
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="text-3xl">{agent.emoji}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-semibold">{agent.name}</h3>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "shrink-0 font-mono text-[9px] uppercase tracking-wider",
-                            isArcMainnet && "border-yellow-400/40 bg-yellow-400/10 text-yellow-300",
-                            isArcTestnet && "border-lime-400/40 bg-lime-400/10 text-lime-300",
-                          )}
-                        >
-                          {isArcMainnet ? t("marketplace.badgeArcMainnet") : isArcTestnet ? t("marketplace.badgeArc") : t("marketplace.badgeBase")}
-                        </Badge>
-                      </div>
-                      <p className="font-mono text-[10px] uppercase text-muted-foreground">
-                        {agent.handle}
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">{agent.description}</p>
-                      <p className={cn("mt-3 font-mono text-xs", isArcMainnet ? "text-yellow-400" : "text-primary")}>
-                        ~{agent.price} {t("landing.perRequest")}
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+          <h2 className="font-display text-2xl font-bold">Arc Research Studio</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {vi
+              ? "Một studio duy nhất gọi API nghiên cứu AI được liệt kê trên Circle Agent Marketplace. Phí thay đổi theo báo giá x402 của nhà cung cấp."
+              : "One focused studio calling an AI research API listed on Circle Agent Marketplace. The provider’s x402 quote determines the charge."}
+          </p>
+          <div className="mt-8 rounded-xl border border-yellow-400/30 bg-gradient-panel p-5">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">🔎</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold">BlockRun AI Search</h3>
+                  <Badge variant="outline" className="shrink-0 border-yellow-400/40 bg-yellow-400/10 font-mono text-[9px] uppercase tracking-wider text-yellow-300">
+                    Arc Mainnet
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {vi
+                    ? "Tìm kiếm web và tin tức bằng AI, tạo tóm tắt kèm liên kết nguồn. Thanh toán x402 bằng USDC trên Arc."
+                    : "AI search across web and news, with a sourced summary. Paid through x402 in USDC on Arc."}
+                </p>
+                <p className="mt-3 font-mono text-xs text-primary">
+                  {vi ? "Phí hiển thị trước khi thanh toán theo báo giá trực tiếp" : "Live price shown from the quote before payment"}
+                </p>
+              </div>
+            </div>
           </div>
           <div className="mt-10 text-center">
             {isLoaded && !isSignedIn ? (
@@ -195,7 +175,7 @@ function Feature({
   text,
   highlight,
 }: {
-  icon: typeof Store;
+  icon: typeof Sparkles;
   title: string;
   text: string;
   highlight?: boolean;

@@ -26,7 +26,7 @@ export type RepairSettlementHoldsResult = StaleReservedRelease & {
 };
 
 /** USDC still on-chain but already debited in SQLite (awaiting user→x402 payer transfer). */
-export function getOnchainSettlementHoldUsdc(userId: string): number {
+export function getOnchainSettlementHoldUsdc(userId: string, targetChainId?: number): number {
   const db = getDb();
   const row = db
     .select({
@@ -37,6 +37,9 @@ export function getOnchainSettlementHoldUsdc(userId: string): number {
       and(
         eq(pendingOnchainSettlements.userId, userId),
         inArray(pendingOnchainSettlements.status, [...ACTIVE_HOLD_STATUSES]),
+        ...(targetChainId == null
+          ? []
+          : [eq(pendingOnchainSettlements.targetChainId, targetChainId)]),
       ),
     )
     .get();

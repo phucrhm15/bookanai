@@ -1,4 +1,4 @@
-import { AGENTS } from "@/lib/mock-data";
+import { AGENTS } from "@/lib/agent-catalog";
 import { translate } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/types";
 

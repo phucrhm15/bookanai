@@ -1,6 +1,5 @@
 /**
- * Arc Testnet agent network gateway — auto-select payment chain from x402 accepts.
- * Register agent ids in ARC_TESTNET_AGENT_IDS for Arc-branded Studio agents.
+ * Chain routing for the Arc Research Studio.
  */
 import {
   ARC_CHAIN_ID,
@@ -22,16 +21,13 @@ export type X402NetworkAccept = {
  * Agents explicitly routed to Arc Testnet UX / settlement preference.
  * LIVE Circle API keys cannot create Arc DCW wallets — settlement falls back to Base.
  */
-export const ARC_TESTNET_AGENT_IDS = new Set<string>(["arc-market-pulse", "arc-sonar-brief"]);
+export const ARC_TESTNET_AGENT_IDS = new Set<string>();
 
 /**
  * Agents running on Arc Mainnet (real USDC, chain ID 5042).
  */
 export const ARC_MAINNET_AGENT_IDS = new Set<string>([
-  "arc-defi-oracle",
-  "arc-mainnet-pulse",
-  "arc-chain-analytics",
-  "lonestar-crypto-news",
+  "arc-research",
 ]);
 
 export function agentAcceptsArcTestnet(accepts?: X402NetworkAccept[]): boolean {

@@ -124,7 +124,12 @@ export async function probeX402ResourcePrice(
     if (res.status === 402) {
       const header = res.headers.get("PAYMENT-REQUIRED") ?? res.headers.get("payment-required");
       const fromHeader = header ? priceFromPaymentRequiredHeader(header, chainId) : null;
-      const fromDiscovery = priceUsdcFromDiscoveryAnyChain(accepts, chainId);
+      // Arc Mainnet studios must never borrow a Base/Testnet catalog quote.
+      const fromDiscovery = chainId === 5042
+        ? (priceUsdcFromDiscoveryAccepts(accepts, chainId) == null
+            ? null
+            : { priceUsdc: priceUsdcFromDiscoveryAccepts(accepts, chainId)!, chainId })
+        : priceUsdcFromDiscoveryAnyChain(accepts, chainId);
       const priceUsdc = fromHeader ?? fromDiscovery?.priceUsdc ?? null;
 
       if (priceUsdc === null || !Number.isFinite(priceUsdc) || priceUsdc <= 0) {
@@ -141,7 +146,11 @@ export async function probeX402ResourcePrice(
       };
     }
 
-    const fromDiscovery = priceUsdcFromDiscoveryAnyChain(accepts, chainId);
+    const fromDiscovery = chainId === 5042
+      ? (priceUsdcFromDiscoveryAccepts(accepts, chainId) == null
+          ? null
+          : { priceUsdc: priceUsdcFromDiscoveryAccepts(accepts, chainId)!, chainId })
+      : priceUsdcFromDiscoveryAnyChain(accepts, chainId);
     if (fromDiscovery) {
       return {
         status: res.status,

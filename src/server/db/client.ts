@@ -55,6 +55,9 @@ function ensureMigrations(): void {
   if (!userColumns.some((column) => column.name === "arc_mainnet_wallet_id")) {
     database.exec("ALTER TABLE users ADD COLUMN arc_mainnet_wallet_id TEXT");
   }
+  if (!userColumns.some((column) => column.name === "arc_mainnet_address")) {
+    database.exec("ALTER TABLE users ADD COLUMN arc_mainnet_address TEXT");
+  }
   database.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS users_arc_mainnet_wallet_id_uidx ON users(arc_mainnet_wallet_id)",
   );

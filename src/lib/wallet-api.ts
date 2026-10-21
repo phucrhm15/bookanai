@@ -17,6 +17,7 @@ export type WalletApiResponse = {
   userId: string;
   walletId: string;
   address: string;
+  arcMainnetAddress?: string | null;
   ledgerBalance: number;
   /** min(ledger, on-chain − settlement hold) — what Studio can spend */
   spendableCreditsUsdc?: number;

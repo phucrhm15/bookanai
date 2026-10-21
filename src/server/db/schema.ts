@@ -8,8 +8,9 @@ export const users = sqliteTable(
   {
     userId: text("user_id").primaryKey(),
     circleWalletId: text("circle_wallet_id").notNull(),
-    /** Separate Circle resource for Arc Mainnet; it shares the user's EVM address. */
+    /** Separate Circle resource and destination address for Arc Mainnet. */
     arcMainnetWalletId: text("arc_mainnet_wallet_id"),
+    arcMainnetAddress: text("arc_mainnet_address"),
     address: text("address").notNull(),
     /** USDC × 10^6 — avoids floating-point ledger drift */
     ledgerBalanceMicroUsdc: integer("ledger_balance_micro_usdc").notNull(),

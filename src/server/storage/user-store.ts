@@ -14,6 +14,7 @@ export type UserRecord = {
   userId: ClerkId;
   circleWalletId: string;
   arcMainnetWalletId: string | null;
+  arcMainnetAddress: string | null;
   address: string;
   ledgerBalance: number;
   transactions: WalletTransaction[];
@@ -47,6 +48,7 @@ function rowToUserRecord(
     userId: row.userId,
     circleWalletId: row.circleWalletId,
     arcMainnetWalletId: row.arcMainnetWalletId,
+    arcMainnetAddress: row.arcMainnetAddress,
     address: row.address,
     ledgerBalance: microToUsdc(row.ledgerBalanceMicroUsdc),
     transactions,
@@ -122,6 +124,7 @@ export const userStore = {
     clerkId: ClerkId;
     circleWalletId: string;
     arcMainnetWalletId?: string | null;
+    arcMainnetAddress?: string | null;
     address: string;
     ledgerBalance: number;
   }): UserRecord {
@@ -143,6 +146,9 @@ export const userStore = {
             ...(params.arcMainnetWalletId !== undefined
               ? { arcMainnetWalletId: params.arcMainnetWalletId }
               : {}),
+            ...(params.arcMainnetAddress !== undefined
+              ? { arcMainnetAddress: params.arcMainnetAddress }
+              : {}),
             address: params.address,
             ledgerBalanceMicroUsdc: micro,
             updatedAt: now,
@@ -155,6 +161,7 @@ export const userStore = {
             userId: params.clerkId,
             circleWalletId: params.circleWalletId,
             arcMainnetWalletId: params.arcMainnetWalletId ?? null,
+            arcMainnetAddress: params.arcMainnetAddress ?? null,
             address: params.address,
             ledgerBalanceMicroUsdc: micro,
             createdAt: now,

@@ -8,6 +8,7 @@ export type ExistingCircleWallet = {
   address: string;
   usdcBalance: number;
   arcMainnetWalletId?: string;
+  arcMainnetAddress?: string;
 };
 
 function readRefId(wallet: Record<string, unknown>): string | undefined {
@@ -88,6 +89,7 @@ export async function findExistingCircleWalletForClerk(
         address: m.address,
         usdcBalance,
         arcMainnetWalletId: matches.find((wallet) => wallet.blockchain === "ARC")?.id,
+        arcMainnetAddress: matches.find((wallet) => wallet.blockchain === "ARC")?.address,
       };
     }
   }

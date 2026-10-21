@@ -2,6 +2,7 @@ CREATE TABLE `users` (
 	`user_id` text PRIMARY KEY NOT NULL,
 	`circle_wallet_id` text NOT NULL,
 	`arc_mainnet_wallet_id` text,
+	`arc_mainnet_address` text,
 	`address` text NOT NULL,
 	`ledger_balance_micro_usdc` integer NOT NULL,
 	`created_at` integer NOT NULL,

@@ -167,8 +167,9 @@ async function fetchUnifiedBalanceViaDcw(walletId: string): Promise<UnifiedBalan
 export type EmbeddedWalletInfo = {
   userId: string;
   circleWalletId: string;
-  /** Same EVM address on Base and Arc (Circle wallet set) */
+  /** Primary Circle wallet address. */
   address: string;
+  arcMainnetAddress: string | null;
   ledgerBalance: number;
   unifiedBalance: UnifiedBalanceSnapshot;
   usdcContractAddress: string;
@@ -213,10 +214,9 @@ export async function getUnifiedBalance(walletId: string): Promise<UnifiedBalanc
 
 async function ensureArcMainnetWalletId(
   clerkId: string,
-  address: string,
   client: ReturnType<typeof getDcwClient>,
   env: ReturnType<typeof getServerEnv>,
-): Promise<string> {
+): Promise<{ id: string; address: string }> {
   const existing = await findCircleWalletIdForClerkBlockchain(
     client,
     env.CIRCLE_WALLET_SET_ID,
@@ -224,13 +224,7 @@ async function ensureArcMainnetWalletId(
     DCW_BLOCKCHAIN_ARC_MAINNET,
   );
   if (existing) {
-    if (existing.address.toLowerCase() !== address.toLowerCase()) {
-      throw new CircleServiceError(
-        "Circle Arc Mainnet wallet address does not match the user's EVM wallet address.",
-        "WALLET_NOT_FOUND",
-      );
-    }
-    return existing.id;
+    return existing;
   }
 
   const created = await client.createWallets({
@@ -246,15 +240,14 @@ async function ensureArcMainnetWalletId(
   ) ?? created.data?.wallets?.[0];
   if (
     !arcWallet?.id ||
-    !arcWallet.address ||
-    arcWallet.address.toLowerCase() !== address.toLowerCase()
+    !arcWallet.address
   ) {
     throw new CircleServiceError(
       "Circle could not provision this user's Arc Mainnet wallet. Verify the LIVE API key and wallet set.",
       "UNSUPPORTED_CHAIN",
     );
   }
-  return arcWallet.id;
+  return { id: arcWallet.id, address: arcWallet.address };
 }
 
 /**
@@ -265,17 +258,20 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
   if (existing) {
     const env = getServerEnv();
     let arcMainnetWalletId = existing.arcMainnetWalletId;
-    if (isLiveCircleApiKey(env.CIRCLE_API_KEY) && !arcMainnetWalletId) {
-      arcMainnetWalletId = await ensureArcMainnetWalletId(
+    let arcMainnetAddress = existing.arcMainnetAddress;
+    if (isLiveCircleApiKey(env.CIRCLE_API_KEY) && (!arcMainnetWalletId || !arcMainnetAddress)) {
+      const arcWallet = await ensureArcMainnetWalletId(
         userId,
-        existing.address,
         getDcwClient(),
         env,
       );
+      arcMainnetWalletId = arcWallet.id;
+      arcMainnetAddress = arcWallet.address;
       userStore.upsertFromClerk({
         clerkId: userId,
         circleWalletId: existing.circleWalletId,
         arcMainnetWalletId,
+        arcMainnetAddress,
         address: existing.address,
         ledgerBalance: existing.ledgerBalance,
       });
@@ -302,14 +298,16 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
     userId,
   );
   if (reused) {
-    const arcMainnetWalletId = isLiveCircleApiKey(env.CIRCLE_API_KEY)
-      ? reused.arcMainnetWalletId ??
-        (await ensureArcMainnetWalletId(userId, reused.address, client, env))
+    const arcWallet = isLiveCircleApiKey(env.CIRCLE_API_KEY)
+      ? await ensureArcMainnetWalletId(userId, client, env)
       : null;
+    const arcMainnetWalletId = arcWallet?.id ?? null;
+    const arcMainnetAddress = arcWallet?.address ?? null;
     userStore.upsertFromClerk({
       clerkId: userId,
       circleWalletId: reused.id,
       arcMainnetWalletId,
+      arcMainnetAddress,
       address: reused.address,
       ledgerBalance: reused.usdcBalance,
     });
@@ -353,13 +351,17 @@ export async function createUserEmbeddedWallet(userId: string): Promise<Embedded
   }
 
   let arcMainnetWalletId = arcMainnetWallet?.id ?? null;
+  let arcMainnetAddress = arcMainnetWallet?.address ?? null;
   if (isLiveCircleApiKey(env.CIRCLE_API_KEY) && !arcMainnetWalletId) {
-    arcMainnetWalletId = await ensureArcMainnetWalletId(userId, wallet.address, client, env);
+    const arcWallet = await ensureArcMainnetWalletId(userId, client, env);
+    arcMainnetWalletId = arcWallet.id;
+    arcMainnetAddress = arcWallet.address;
   }
   userStore.upsertFromClerk({
     clerkId: userId,
     circleWalletId: wallet.id,
     arcMainnetWalletId,
+    arcMainnetAddress,
     address: wallet.address,
     ledgerBalance: 0,
   });
@@ -376,13 +378,20 @@ export async function ensureClerkUserWalletSynced(clerkId: string): Promise<Embe
 }
 
 function buildWalletInfo(
-  record: { userId: string; circleWalletId: string; address: string; ledgerBalance: number },
+  record: {
+    userId: string;
+    circleWalletId: string;
+    arcMainnetAddress: string | null;
+    address: string;
+    ledgerBalance: number;
+  },
   unified: UnifiedBalanceSnapshot,
 ): EmbeddedWalletInfo {
   return {
     userId: record.userId,
     circleWalletId: record.circleWalletId,
     address: record.address,
+    arcMainnetAddress: record.arcMainnetAddress,
     ledgerBalance: record.ledgerBalance,
     unifiedBalance: unified,
     usdcContractAddress: ARC_USDC_CONTRACT_ADDRESS,

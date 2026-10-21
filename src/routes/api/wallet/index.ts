@@ -50,7 +50,11 @@ export const Route = createFileRoute("/api/wallet/")({
             {
               userId: clerkId,
               walletId: wallet.circleWalletId,
-              address: wallet.address,
+              address:
+                preferredChainId === ARC_MAINNET_NETWORK.id
+                  ? wallet.arcMainnetAddress ?? wallet.address
+                  : wallet.address,
+              arcMainnetAddress: wallet.arcMainnetAddress,
               ledgerBalance: credits.ledgerBalance,
               spendableCreditsUsdc: Math.min(
                 credits.ledgerBalance,
@@ -113,7 +117,11 @@ export const Route = createFileRoute("/api/wallet/")({
           return Response.json({
             userId: clerkId,
             walletId: wallet.circleWalletId,
-            address: wallet.address,
+            address:
+              preferredChainId === ARC_MAINNET_NETWORK.id
+                ? wallet.arcMainnetAddress ?? wallet.address
+                : wallet.address,
+            arcMainnetAddress: wallet.arcMainnetAddress,
             ledgerBalance: credits.ledgerBalance,
             spendableCreditsUsdc,
             settlementHoldUsdc: preferredChainHold,

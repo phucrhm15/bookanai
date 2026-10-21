@@ -16,13 +16,7 @@ import { userStore } from "@/server/storage/user-store";
 function withRouteBudget<T>(work: () => Promise<T>, budgetMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(
-      () =>
-        reject(
-          new CircleServiceError(
-            `Nanopayment route exceeded ${budgetMs}ms`,
-            "TIMEOUT",
-          ),
-        ),
+      () => reject(new CircleServiceError(`Nanopayment route exceeded ${budgetMs}ms`, "TIMEOUT")),
       budgetMs,
     );
     work()
@@ -124,11 +118,13 @@ export const Route = createFileRoute("/api/wallet/nanopayment")({
                 ? 402
                 : error.code === "DUPLICATE_PAYMENT"
                   ? 409
-                : error.code === "UNSUPPORTED_CHAIN"
-                  ? 400
-                  : error.code === "NETWORK_ERROR" || error.code === "TIMEOUT"
-                    ? 504
-                    : 500;
+                  : error.code === "UNSUPPORTED_CHAIN"
+                    ? 400
+                    : error.code === "INVALID_REQUEST"
+                      ? 400
+                      : error.code === "NETWORK_ERROR" || error.code === "TIMEOUT"
+                        ? 504
+                        : 500;
             return Response.json({ error: error.message, code: error.code }, { status });
           }
           const message = error instanceof Error ? error.message : "Nanopayment error";

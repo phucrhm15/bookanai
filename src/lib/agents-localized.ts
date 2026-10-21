@@ -6,13 +6,14 @@ const REMOVED_AGENT_IDS = new Set(["messari-analyst", "surf-tokenomics"]);
 
 const AGENT_I18N_KEYS: Record<
   string,
-  "perplexity" | "surf" | "stackB" | "arcMarketPulse" | "arcSonarBrief"
+  "perplexity" | "surf" | "stackB" | "arcMarketPulse" | "arcSonarBrief" | "loneStarNews"
 > = {
   "perplexity-social": "perplexity",
   "surf-news": "surf",
   "crypto-research-b": "stackB",
   "arc-market-pulse": "arcMarketPulse",
   "arc-sonar-brief": "arcSonarBrief",
+  "lonestar-crypto-news": "loneStarNews",
 };
 
 /** Agents with locale-specific description & category (names stay English). */
@@ -28,10 +29,7 @@ export function getLocalizedAgents(locale: Locale): Agent[] {
   });
 }
 
-export function getLocalizedAgentsByNetwork(
-  locale: Locale,
-  network: Agent["network"],
-): Agent[] {
+export function getLocalizedAgentsByNetwork(locale: Locale, network: Agent["network"]): Agent[] {
   return getLocalizedAgents(locale).filter((a) => a.network === network);
 }
 

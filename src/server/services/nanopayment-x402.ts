@@ -29,9 +29,7 @@ import {
   agentUsesGatewayPolygonPay,
   agentPrefersArcMainnet,
 } from "@/services/agent-service-map";
-import {
-  assertMasterGatewayPolygonUsdc,
-} from "@/server/services/x402-master-pay";
+import { assertMasterGatewayPolygonUsdc } from "@/server/services/x402-master-pay";
 import {
   activateOnchainSettlement,
   cancelOnchainSettlementForLedgerEntry,
@@ -62,9 +60,7 @@ function assertAgentResponseUsable(data: unknown, bodyText: string): void {
       const detail =
         typeof obj.error === "string"
           ? obj.error
-          : typeof obj.error === "object" &&
-              obj.error &&
-              "message" in (obj.error as object)
+          : typeof obj.error === "object" && obj.error && "message" in (obj.error as object)
             ? String((obj.error as { message?: unknown }).message)
             : JSON.stringify(obj.error).slice(0, 200);
       throw new CircleServiceError(
@@ -121,6 +117,9 @@ export function payOptionsForAgent(
       body: { query: q },
     };
   }
+  if (agentServiceId === "lonestar-crypto-news") {
+    return { method: "GET", headers: { Accept: "application/json" } };
+  }
   return undefined;
 }
 
@@ -130,8 +129,11 @@ export function withAgentResourceQuery(
   resourceUrl: string,
   _prompt?: string,
 ): string {
-  void agentServiceId;
-  void _prompt;
+  if (agentServiceId === "lonestar-crypto-news" && _prompt?.trim()) {
+    const url = new URL(resourceUrl);
+    url.searchParams.set("query", _prompt.trim());
+    return url.toString();
+  }
   return resourceUrl;
 }
 
@@ -151,9 +153,13 @@ export async function processNanopaymentX402(
   }
 
   if (!isSupportedChainId(targetChainId)) {
+    throw new CircleServiceError(`Unsupported targetChainId ${targetChainId}`, "UNSUPPORTED_CHAIN");
+  }
+
+  if (agentServiceId === "lonestar-crypto-news" && !prompt?.trim()) {
     throw new CircleServiceError(
-      `Unsupported targetChainId ${targetChainId}`,
-      "UNSUPPORTED_CHAIN",
+      "Hãy nhập token hoặc chủ đề cần phân tích trước khi chạy LoneStarOracle.",
+      "INVALID_REQUEST",
     );
   }
 
@@ -168,13 +174,7 @@ export async function processNanopaymentX402(
   userStore.requireByClerkId(clerkId);
 
   if (agentServiceId === RESEARCH_STACK_B_AGENT_ID) {
-    return processResearchStackB(
-      clerkId,
-      userWalletId,
-      paymentChainId,
-      prompt,
-      idempotencyKey,
-    );
+    return processResearchStackB(clerkId, userWalletId, paymentChainId, prompt, idempotencyKey);
   }
 
   const { resourceUrl: mappedUrl, discoveryItem } = await resolveAgentResource(agentServiceId);
@@ -208,7 +208,7 @@ export async function processNanopaymentX402(
   let probe;
   try {
     probe = await probeX402ResourcePrice(
-      mappedUrl,
+      resourceUrl,
       paymentChainId,
       discoveryItem.accepts,
       probeInit,
@@ -216,10 +216,7 @@ export async function processNanopaymentX402(
   } catch (probeError) {
     const fallback = STUDIO_AGENT_FALLBACK_PRICE_USDC[agentServiceId];
     if (fallback == null) throw probeError;
-    console.warn(
-      `[x402] Probe fallback for ${agentServiceId}: ${fallback} USDC`,
-      probeError,
-    );
+    console.warn(`[x402] Probe fallback for ${agentServiceId}: ${fallback} USDC`, probeError);
     probe = { status: 402, paymentRequired: true, priceUsdc: fallback };
   }
   const agentPriceUsdc = probe.priceUsdc;
@@ -314,9 +311,7 @@ export async function processNanopaymentX402(
     }
 
     const bodyText =
-      typeof response.data === "string"
-        ? response.data
-        : JSON.stringify(response.data ?? {});
+      typeof response.data === "string" ? response.data : JSON.stringify(response.data ?? {});
 
     assertAgentResponseUsable(response.data, bodyText);
 

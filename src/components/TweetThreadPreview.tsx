@@ -72,9 +72,7 @@ function renderMarkdownBoldPreview(input: string): ReactNode[] {
 type JsonRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): JsonRecord | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : null;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
 function pickString(obj: JsonRecord, keys: string[]): string | undefined {
@@ -182,6 +180,68 @@ function formatSurfData(data: unknown, t: TFn): string {
   return `${header}\n${JSON.stringify(root, null, 2).slice(0, 2000)}`;
 }
 
+/** Format LoneStarOracle's crypto/news sentiment response for the X preview. */
+function formatLoneStarNews(data: unknown, t: TFn): string {
+  const outer = asRecord(data);
+  const root = outer ? (asRecord(outer.data) ?? outer) : null;
+  if (!root) {
+    return typeof data === "string"
+      ? `${t("thread.loneStarHeader")}\n${data}`
+      : t("thread.loneStarEmpty");
+  }
+
+  const lines = [t("thread.loneStarHeader")];
+  const query = pickString(root, ["query", "topic"]);
+  if (query) lines.push(`Query: ${query}`);
+
+  const distribution = asRecord(root.distribution);
+  if (distribution) {
+    const values = ["bullish", "bearish", "neutral", "mixed"]
+      .map((key) => {
+        const value = distribution[key];
+        return typeof value === "number" || typeof value === "string"
+          ? `${key} ${value}`
+          : undefined;
+      })
+      .filter((value): value is string => Boolean(value));
+    if (values.length) {
+      lines.push(`${t("thread.sentimentDistribution")}: ${values.join(" · ")}`);
+    }
+  }
+
+  const aggregate = pickString(root, ["aggregate_score", "aggregateScore"]);
+  const tone = pickString(root, ["tone"]);
+  if (aggregate || tone) {
+    lines.push(
+      `${t("thread.sentimentAggregate")}: ${[aggregate, tone].filter(Boolean).join(" · ")}`,
+    );
+  }
+
+  const headlineValue = root.headlines ?? root.results ?? root.items;
+  if (Array.isArray(headlineValue) && headlineValue.length) {
+    lines.push(`\n${t("thread.sentimentHeadlines")}:`);
+    for (const entry of headlineValue.slice(0, 6)) {
+      const headline = asRecord(entry);
+      if (!headline) continue;
+      const title = pickString(headline, ["headline", "title", "text"]);
+      const source = pickString(headline, ["source", "publisher"]);
+      const signal = pickString(headline, ["signal", "sentiment"]);
+      const reason = pickString(headline, ["reason", "summary", "description"]);
+      const url = pickString(headline, ["url", "link"]);
+      if (title) lines.push(`• ${title}`);
+      const details = [signal, source].filter(Boolean).join(" · ");
+      if (details) lines.push(`  ${details}`);
+      if (reason) lines.push(`  ${reason}`);
+      if (url) lines.push(`  ${url}`);
+    }
+  }
+
+  if (lines.length === 1) {
+    return `${t("thread.loneStarHeader")}\n${JSON.stringify(root, null, 2).slice(0, 2000)}`;
+  }
+  return lines.join("\n");
+}
+
 /**
  * Parse raw x402 API JSON by agent and return a single formatted string
  * (before thread splitting).
@@ -191,6 +251,9 @@ export function parseAgentData(agentId: string, rawResponse: string, t: TFn): st
   if (!trimmed) {
     if (agentId === "surf-news" || agentId === "arc-market-pulse") {
       return `${t("thread.surfHeader")}\n${t("thread.responseEmpty")}`;
+    }
+    if (agentId === "lonestar-crypto-news") {
+      return `${t("thread.loneStarHeader")}\n${t("thread.loneStarEmpty")}`;
     }
     if (agentId === "arc-sonar-brief") {
       return `${t("thread.perplexityHeader")}\n${t("thread.responseEmpty")}`;
@@ -205,6 +268,9 @@ export function parseAgentData(agentId: string, rawResponse: string, t: TFn): st
     }
     if (agentId === "surf-news" || agentId === "arc-market-pulse") {
       return formatSurfData(parsed, t);
+    }
+    if (agentId === "lonestar-crypto-news") {
+      return formatLoneStarNews(parsed, t);
     }
     if (agentId === "crypto-research-b" && isStackBReport(parsed)) {
       return formatStackBForDisplay(parsed);
@@ -317,22 +383,25 @@ export function TweetThreadPreview({
     }));
   }, [agentId, rawResponse, t]);
 
-  const handleCopy = useCallback((text: string, index: number) => {
-    if (typeof window === "undefined" || !navigator.clipboard) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        await navigator.clipboard.writeText(text);
-        setCopiedIndex(index);
-        toast.success(t("thread.copied"));
-        setTimeout(() => setCopiedIndex(null), 2000);
-      } catch {
-        toast.error(t("thread.copyFailed"));
+  const handleCopy = useCallback(
+    (text: string, index: number) => {
+      if (typeof window === "undefined" || !navigator.clipboard) {
+        return;
       }
-    })();
-  }, [t]);
+
+      void (async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopiedIndex(index);
+          toast.success(t("thread.copied"));
+          setTimeout(() => setCopiedIndex(null), 2000);
+        } catch {
+          toast.error(t("thread.copyFailed"));
+        }
+      })();
+    },
+    [t],
+  );
 
   if (loading) {
     return (
@@ -368,11 +437,7 @@ export function TweetThreadPreview({
           className="rounded-xl border border-border/60 bg-card/80 p-4 backdrop-blur-xl"
         >
           <div className="flex gap-3">
-            <ThreadAvatar
-              authorName={authorName}
-              avatarEmoji={avatarEmoji}
-              avatarUrl={avatarUrl}
-            />
+            <ThreadAvatar authorName={authorName} avatarEmoji={avatarEmoji} avatarUrl={avatarUrl} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-1 text-sm">

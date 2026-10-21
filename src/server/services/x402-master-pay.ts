@@ -3,7 +3,15 @@
  * - Circle Gateway batching (AIsa / Discovery sellers)
  * - Standard EIP-3009 exact (Messari and other non-Gateway sellers)
  */
-import { createPublicClient, createWalletClient, formatUnits, http, parseAbi, parseUnits, defineChain } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  formatUnits,
+  http,
+  parseAbi,
+  parseUnits,
+  defineChain,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base, polygon } from "viem/chains";
 
@@ -32,14 +40,9 @@ import {
 import { sanitizeRpcUrls } from "@/lib/rpc-urls";
 import { getServerEnv } from "@/server/config/env";
 import { CircleServiceError } from "@/services/circle-errors";
-import {
-  getDiscoveryCatalogItem,
-  type DiscoveryAccept,
-} from "@/services/agent-service-map";
+import { getDiscoveryCatalogItem, type DiscoveryAccept } from "@/services/agent-service-map";
 
-const erc20BalanceAbi = parseAbi([
-  "function balanceOf(address account) view returns (uint256)",
-]);
+const erc20BalanceAbi = parseAbi(["function balanceOf(address account) view returns (uint256)"]);
 
 export type X402PayRequestInit = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -282,7 +285,9 @@ async function resolveGatewayChainForResource(
   if (catalog?.accepts?.length) {
     const fromCatalog = gatewayChainFromDiscoveryAccepts(catalog.accepts, resourceUrl);
     if (fromCatalog) {
-      console.info(`[x402] Gateway chain from Discovery catalog: ${fromCatalog} for ${resourceUrl}`);
+      console.info(
+        `[x402] Gateway chain from Discovery catalog: ${fromCatalog} for ${resourceUrl}`,
+      );
       return fromCatalog;
     }
   }
@@ -317,8 +322,7 @@ function chainIdFromEip155(network?: string): number | undefined {
 }
 
 function parsePaymentRequiredAcceptsFromHeader(response: Response): PaymentRequiredAccept[] {
-  const raw =
-    response.headers.get("PAYMENT-REQUIRED") ?? response.headers.get("payment-required");
+  const raw = response.headers.get("PAYMENT-REQUIRED") ?? response.headers.get("payment-required");
   if (!raw) return [];
   try {
     const parsed = JSON.parse(
@@ -344,8 +348,7 @@ async function readGatewayUsdcBalances(
 
   let onChainAvailable = 0;
   try {
-    const rpcUrls =
-      gatewayChain === "polygon" ? polygonRpcCandidates() : rpcUrlCandidates();
+    const rpcUrls = gatewayChain === "polygon" ? polygonRpcCandidates() : rpcUrlCandidates();
     const onChainChain = gatewayChain === "polygon" ? "polygon" : "base";
     const snapshot = await getGatewayLiquiditySnapshot(
       depositor,
@@ -411,9 +414,7 @@ async function autoDepositWalletUsdcIntoGateway(
       "function allowance(address owner, address spender) view returns (uint256)",
       "function approve(address spender, uint256 value) returns (bool)",
     ]);
-    const gatewayAbi = parseAbi([
-      "function deposit(address token, uint256 amount)",
-    ]);
+    const gatewayAbi = parseAbi(["function deposit(address token, uint256 amount)"]);
 
     const allowance = await publicClient.readContract({
       address: usdc,
@@ -456,11 +457,7 @@ async function ensureGatewayLiquidity(
   if (balances.effectiveAvailable < minUsdc) {
     const shortfall = minUsdc - balances.effectiveAvailable + 0.001;
     try {
-      const deposited = await autoDepositWalletUsdcIntoGateway(
-        gateway,
-        gatewayChain,
-        shortfall,
-      );
+      const deposited = await autoDepositWalletUsdcIntoGateway(gateway, gatewayChain, shortfall);
       if (deposited > 0) {
         balances = await readGatewayUsdcBalances(gateway, gatewayChain);
       }
@@ -560,12 +557,14 @@ async function payViaGateway(
     );
   }
 
-  const paymentPayload = await (gateway as unknown as {
-    createPaymentPayload: (
-      version: number,
-      requirements: PaymentRequiredAccept,
-    ) => Promise<Record<string, unknown>>;
-  }).createPaymentPayload(paymentRequired.x402Version ?? 2, batchingOption);
+  const paymentPayload = await (
+    gateway as unknown as {
+      createPaymentPayload: (
+        version: number,
+        requirements: PaymentRequiredAccept,
+      ) => Promise<Record<string, unknown>>;
+    }
+  ).createPaymentPayload(paymentRequired.x402Version ?? 2, batchingOption);
 
   const paymentHeader = Buffer.from(
     JSON.stringify({
@@ -641,9 +640,18 @@ async function payViaExactEvm(
     const requiredChainIds = accepts
       .map((a) => chainIdFromEip155(a.network))
       .filter((id): id is number => Number.isFinite(id));
-    // For Arc Mainnet agents: do NOT add Base (8453) as a fallback — x402 must settle on Arc.
+    // Arc Mainnet-only agents must never select a different advertised chain.
+    if (chainId === 5042 && !requiredChainIds.includes(5042)) {
+      throw new CircleServiceError(
+        "x402 endpoint did not advertise Arc Mainnet (eip155:5042); payment was not sent",
+        "UNSUPPORTED_CHAIN",
+      );
+    }
     const extraFallbacks = chainId === 5042 ? [] : [8453, 137];
-    const candidateChains = Array.from(new Set([chainId, ...requiredChainIds, ...extraFallbacks]));
+    const candidateChains =
+      chainId === 5042
+        ? [5042]
+        : Array.from(new Set([chainId, ...requiredChainIds, ...extraFallbacks]));
     const schemeOptions: Record<number, { rpcUrl: string }> = {};
     for (const c of candidateChains) {
       const rpcUrl = rpcUrlForChain(c);
@@ -653,7 +661,7 @@ async function payViaExactEvm(
     const coreClient = new x402Client();
     registerExactEvmScheme(coreClient, {
       signer: account,
-      networks: candidateChains.map((c) => `eip155:${c}`),
+      networks: candidateChains.map((c) => `eip155:${c}` as `eip155:${number}`),
       schemeOptions,
     });
     const httpClient = new x402HTTPClient(coreClient);
@@ -725,10 +733,7 @@ export async function payX402Resource(
       } catch (error) {
         lastGatewayError = error;
         const message = error instanceof Error ? error.message : String(error);
-        if (
-          message.includes("Gateway batching") ||
-          message.includes("No Gateway batching")
-        ) {
+        if (message.includes("Gateway batching") || message.includes("No Gateway batching")) {
           return payViaExactEvm(resourceUrl, chainId, minUsdc, init);
         }
         const isNetworkFailure =
@@ -736,7 +741,10 @@ export async function payX402Resource(
           message.includes("request failed") ||
           message.includes("NETWORK_ERROR");
         if (isNetworkFailure) {
-          console.warn(`[x402] Gateway pay retry with next RPC after failure on ${rpcUrl}:`, message);
+          console.warn(
+            `[x402] Gateway pay retry with next RPC after failure on ${rpcUrl}:`,
+            message,
+          );
           continue;
         }
         throw error;
@@ -752,21 +760,20 @@ export async function payX402Resource(
   let legacyGateway: InstanceType<typeof GatewayClient> | undefined;
   if (legacyChainKey !== "arc") {
     try {
-      legacyGateway = new GatewayClient({ chain: legacyChainKey, privateKey, rpcUrl: env.BASE_RPC_URL });
-      legacySupport = await legacyGateway.supports(resourceUrl).catch(() => ({ supported: false as const }));
+      legacyGateway = new GatewayClient({
+        chain: legacyChainKey,
+        privateKey,
+        rpcUrl: env.BASE_RPC_URL,
+      });
+      legacySupport = await legacyGateway
+        .supports(resourceUrl)
+        .catch(() => ({ supported: false as const }));
     } catch {
       // chain not supported by installed x402-batching version
     }
   }
   if (legacySupport.supported && legacyGateway) {
-    return payViaGateway(
-      legacyGateway,
-      privateKey,
-      legacyChainKey,
-      resourceUrl,
-      minUsdc,
-      init,
-    );
+    return payViaGateway(legacyGateway, privateKey, legacyChainKey, resourceUrl, minUsdc, init);
   }
 
   return payViaExactEvm(resourceUrl, chainId, minUsdc, init);

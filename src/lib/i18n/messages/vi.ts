@@ -30,7 +30,7 @@ export const vi: typeof en = {
     ctaTry: "Dùng thử ngay",
     featureMarketplaceTitle: "Marketplace",
     featureMarketplaceText:
-      "5 agents trên Base, Arc Testnet và Arc Mainnet — giá USDC được đặt trực tiếp bởi x402 (HTTP 402).",
+      "Duyệt các agent trên Base, Arc Testnet và Arc Mainnet — giá USDC được báo trực tiếp qua x402 (HTTP 402).",
     featureStudioTitle: "Studio",
     featureStudioText:
       "Nhập prompt, thanh toán qua x402 nanopayment, nhận kết quả định dạng sẵn thành thread X.",
@@ -43,8 +43,7 @@ export const vi: typeof en = {
     agentsTitle: "Agents có sẵn",
     agentsHint: "Giá hiển thị là gợi ý — số tiền thực tế do API x402 quyết định khi chạy.",
     perRequest: "USDC / lần gọi",
-    footer:
-      "Powered by Circle Programmable Wallets · x402 · Arc Mainnet · Clerk Auth",
+    footer: "Powered by Circle Programmable Wallets · x402 · Arc Mainnet · Clerk Auth",
     signIn: "Đăng nhập",
     signUpFree: "Bắt đầu miễn phí",
   },
@@ -53,8 +52,7 @@ export const vi: typeof en = {
     poweredBy: "Powered by",
     title: "x402",
     titleAccent: "Data Agents",
-    subtitle:
-      "API x402 thật — agent Base, Arc Testnet và Arc Mainnet. Trả theo lần gọi bằng USDC.",
+    subtitle: "API x402 thật — agent Base, Arc Testnet và Arc Mainnet. Trả theo lần gọi bằng USDC.",
     searchPlaceholder: "Tìm agent…",
     agentsCount: "{{count}} / {{total}} agents",
     usdcPerRequest: "USDC / lần",
@@ -83,8 +81,7 @@ export const vi: typeof en = {
       category: "Thị trường Dự báo",
     },
     stackB: {
-      description:
-        "Nghiên cứu alt một lần bấm (~0.11 USDC): Exa + vaults.fyi + Gloria ticker ×3.",
+      description: "Nghiên cứu alt một lần bấm (~0.11 USDC): Exa + vaults.fyi + Gloria ticker ×3.",
       category: "Research Stack",
     },
     arcMarketPulse: {
@@ -96,6 +93,11 @@ export const vi: typeof en = {
       description:
         "Brief nghiên cứu Perplexity Sonar qua x402 — prompt về Arc / gas USDC. Settle Arc Testnet.",
       category: "Arc Testnet",
+    },
+    loneStarNews: {
+      description:
+        "Tổng hợp sentiment từ headline crypto và vĩ mô, kèm phân bổ bullish/bearish. Thanh toán x402 trực tiếp trên Arc Mainnet, khoảng 0,05 USDC/lần.",
+      category: "Sentiment Crypto",
     },
   },
   studio: {
@@ -119,6 +121,8 @@ export const vi: typeof en = {
       "Quét alt mid-cap: narrative L1/L2/DeFi, TVL, unlock (LOẠI BTC, ETH, BNB, XRP, stablecoin).",
     defaultPromptArcSonar:
       "Giải thích Arc Testnet: USDC làm gas native, nanopayment cho AI agents, và vì sao Circle xây L1 cho stablecoin.",
+    defaultPromptLoneStarNews:
+      "Nghiên cứu vì sao altcoin tăng gần đây. Tóm tắt sentiment từ tin crypto và vĩ mô, các chất xúc tác có thể có, đồng thời phân biệt rõ tin đã xác nhận với suy đoán.",
     promptLabel: "Prompt của bạn",
     agentNoteSurfNews:
       "**Polymarket Pulse** trả tỷ lệ cược dự báo crypto trực tiếp từ Polymarket (~0.001 USDC/lần). Không cần prompt — bấm Chạy Agent để xem sentiment thị trường lên/xuống qua nano.blockrun.ai. Muốn tìm kiếm? Chọn **Web Search Writer**.",
@@ -144,8 +148,7 @@ export const vi: typeof en = {
     badge: "Ví & Thanh toán",
     title: "Số dư",
     titleAccent: "Content Credits",
-    subtitle:
-      "Credits cho AI agents. Không seed phrase — chỉ cần nạp USDC và tạo nội dung.",
+    subtitle: "Credits cho AI agents. Không seed phrase — chỉ cần nạp USDC và tạo nội dung.",
     loadError: "Không tải được ví",
     contentCredits: "Content Credits",
     unifiedBadge: "Unified · Base + Arc",
@@ -239,8 +242,7 @@ export const vi: typeof en = {
     gasRequiredDesc:
       "Nạp Gateway là giao dịch on-chain từ ví embedded. Base tính phí gas bằng ETH (không phải USDC). Gửi ~{{recommended}} ETH trên Base tới {{address}}. Hiện có {{eth}} ETH.",
     insufficientUsdcTitle: "Không đủ USDC on-chain",
-    insufficientUsdcInline:
-      "USDC on-chain trên Base: {{have}} — ít hơn số nạp {{want}}.",
+    insufficientUsdcInline: "USDC on-chain trên Base: {{have}} — ít hơn số nạp {{want}}.",
     onChainHint: "Ví on-chain (Base): {{usdc}} USDC · {{eth}} ETH cho gas",
   },
   arcTools: {
@@ -325,6 +327,11 @@ export const vi: typeof en = {
     perplexityEmpty: "🌍 [TIN TỨC VĨ MÔ]\nKhông có nội dung tìm kiếm.",
     surfHeader: "🏄 [BẢN TIN SURF CRYPTO]",
     surfEmpty: "🏄 [BẢN TIN SURF CRYPTO]\nKhông có nội dung feed trả về.",
+    loneStarHeader: "🧭 [SENTIMENT TIN TỨC CRYPTO]",
+    loneStarEmpty: "API không trả dữ liệu sentiment crypto/tin tức.",
+    sentimentDistribution: "Phân bổ sentiment",
+    sentimentAggregate: "Tín hiệu tổng hợp",
+    sentimentHeadlines: "Headline liên quan",
     responseEmpty: "Phản hồi trống.",
   },
   hints: {
@@ -336,6 +343,8 @@ export const vi: typeof en = {
       "Stack B: **chỉ alt** (~0.11 USDC) — Exa narrative → vaults.fyi yield → Gloria tin ×3. **Loại cứng** BTC, ETH, BNB, XRP & stable ở mọi bước.",
     arcSonarFull:
       "Arc Sonar Brief gửi prompt tới Perplexity Sonar qua x402. Nên hỏi về Arc, gas USDC hoặc hạ tầng stablecoin Circle.",
+    loneStarNewsFull:
+      "LoneStarOracle trả tín hiệu sentiment crypto/tin tức và các headline liên quan. Hỏi về token hoặc biến động thị trường; giá được x402 xác nhận trước khi thanh toán. Cần có đủ USDC trên Arc Mainnet để settlement.",
   },
   meta: {
     homeTitle: "Nano.Agent — AI agents x402 trả bằng USDC",

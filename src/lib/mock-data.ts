@@ -121,6 +121,19 @@ export const AGENTS: Agent[] = [
     baseUrl: "https://api.aisa.one",
     network: "arc",
   },
+  {
+    id: "lonestar-crypto-news",
+    name: "Crypto Sentiment & News",
+    handle: "@lonestar_oracle",
+    category: "Crypto Sentiment",
+    price: 0.05,
+    description:
+      "Crypto and macro headline sentiment from LoneStarOracle. Ask about a token or recent market move; Arc Mainnet x402, about 0.05 USDC per call.",
+    emoji: "🧭",
+    accent: "magenta",
+    baseUrl: "https://news.lonestaroracle.xyz/news",
+    network: "arc",
+  },
 ];
 
 export type Transaction = {

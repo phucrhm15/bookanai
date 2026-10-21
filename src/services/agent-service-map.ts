@@ -34,6 +34,8 @@ export const STUDIO_AGENT_RESOURCES: Record<string, string> = {
   "arc-defi-oracle": "https://api.aisa.one/apis/v2/coingecko/search/trending",
   "arc-mainnet-pulse": "https://api.aisa.one/apis/v2/coingecko/search/trending",
   "arc-chain-analytics": "https://api.aisa.one/apis/v2/perplexity/sonar",
+  /** LoneStarOracle AI crypto/news sentiment — x402 Exact on Arc Mainnet */
+  "lonestar-crypto-news": "https://news.lonestaroracle.xyz/news",
 };
 
 /** UI estimate when Discovery has no accepts and live 402 probe is inconclusive */
@@ -74,6 +76,7 @@ const DIRECT_X402_HOSTS = new Set([
   "api.aisa.one",
   "api.vaults.fyi",
   "api.itsgloria.ai",
+  "news.lonestaroracle.xyz",
 ]);
 
 /** All HTTPS hosts from STUDIO_AGENT_RESOURCES (+ DIRECT_X402_HOSTS). */
@@ -106,8 +109,7 @@ let discoveryCache: DiscoveryItem[] | undefined;
 let discoveryFetchedAt = 0;
 const CACHE_MS = 5 * 60 * 1000;
 
-const AGENT_NOT_FOUND =
-  "Agent không tồn tại hoặc đã bị gỡ khỏi chợ x402";
+const AGENT_NOT_FOUND = "Agent không tồn tại hoặc đã bị gỡ khỏi chợ x402";
 
 function discoveryUrl(): string {
   return getServerEnv().X402_DISCOVERY_URL;
@@ -127,10 +129,7 @@ function discoveryCatalogHosts(items: DiscoveryItem[]): Set<string> {
 }
 
 /** Host must be listed on Circle Discovery or belong to Circle x402 ecosystem (HTTPS only). */
-function assertX402ResourceHost(
-  resourceUrl: string,
-  catalogItems: DiscoveryItem[],
-): void {
+function assertX402ResourceHost(resourceUrl: string, catalogItems: DiscoveryItem[]): void {
   let parsed: URL;
   try {
     parsed = new URL(resourceUrl);
@@ -155,18 +154,14 @@ function assertX402ResourceHost(
       .filter(Boolean) ?? [];
 
   const circleEcosystem =
-    host === "circle.com" ||
-    host.endsWith(".circle.com") ||
-    host.endsWith(".circleapis.com");
+    host === "circle.com" || host.endsWith(".circle.com") || host.endsWith(".circleapis.com");
 
   const explicitlyAllowed = extra.some(
     (allowed) => host === allowed || host.endsWith(`.${allowed}`),
   );
 
   if (!circleEcosystem && !explicitlyAllowed) {
-    throw new Error(
-      `${AGENT_NOT_FOUND}: domain "${host}" không thuộc x402 ecosystem của Circle`,
-    );
+    throw new Error(`${AGENT_NOT_FOUND}: domain "${host}" không thuộc x402 ecosystem của Circle`);
   }
 }
 
@@ -195,9 +190,7 @@ export function findDiscoveryItemForResource(
   items: DiscoveryItem[],
   resourceUrl: string,
 ): DiscoveryItem | undefined {
-  const exact = items.find(
-    (item) => item.type === "http" && item.resource === resourceUrl,
-  );
+  const exact = items.find((item) => item.type === "http" && item.resource === resourceUrl);
   if (exact) return exact;
 
   try {
@@ -231,9 +224,7 @@ export async function getDiscoveryCatalogItem(
  * Resolve a paid x402 resource URL for a Studio agent id.
  * Circle Discovery exact match first; host allowlist for direct x402 sellers.
  */
-export async function resolveAgentResource(
-  agentId: string,
-): Promise<ResolvedAgentResource> {
+export async function resolveAgentResource(agentId: string): Promise<ResolvedAgentResource> {
   const mappedUrl = STUDIO_AGENT_RESOURCES[agentId];
   if (!mappedUrl) {
     throw new Error(`Unknown Studio agent id: ${agentId}`);

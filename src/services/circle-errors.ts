@@ -7,6 +7,7 @@ export class CircleServiceError extends Error {
       | "INSUFFICIENT_BALANCE"
       | "DUPLICATE_PAYMENT"
       | "UNSUPPORTED_CHAIN"
+      | "INVALID_REQUEST"
       | "PAYMENT_REQUIRED"
       | "NETWORK_ERROR"
       | "SETTLEMENT_FAILED"

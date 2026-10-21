@@ -36,13 +36,11 @@ const DEFAULT_PROMPT_KEYS: Partial<Record<string, string>> = {
   "perplexity-social": "studio.defaultPromptPerplexity",
   "crypto-research-b": "studio.defaultPromptStackB",
   "arc-sonar-brief": "studio.defaultPromptArcSonar",
+  "lonestar-crypto-news": "studio.defaultPromptLoneStarNews",
 };
 
 /** Pre-filled Studio prompt (user can edit or replace). */
-export function defaultPromptForAgent(
-  agentId: string,
-  locale: Locale = DEFAULT_LOCALE,
-): string {
+export function defaultPromptForAgent(agentId: string, locale: Locale = DEFAULT_LOCALE): string {
   const key = DEFAULT_PROMPT_KEYS[agentId];
   return key ? translate(locale, key) : "";
 }
@@ -102,6 +100,13 @@ export function agentPromptBehavior(
     };
   }
 
+  if (agentId === "lonestar-crypto-news") {
+    return {
+      mode: "full",
+      info: translate(locale, "hints.loneStarNewsFull"),
+    };
+  }
+
   return { mode: "full" };
 }
 
@@ -113,7 +118,11 @@ export function agentPromptMismatch(
   const trimmed = prompt.trim();
   if (!trimmed) return { warn: false };
 
-  if (agentId === "perplexity-social" && isMarketDataPrompt(trimmed) && !isMacroNewsPrompt(trimmed)) {
+  if (
+    agentId === "perplexity-social" &&
+    isMarketDataPrompt(trimmed) &&
+    !isMacroNewsPrompt(trimmed)
+  ) {
     return {
       warn: true,
       message: translate(locale, "hints.perplexityMismatch"),

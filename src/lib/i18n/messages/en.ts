@@ -28,7 +28,7 @@ export const en = {
     ctaTry: "Try it now",
     featureMarketplaceTitle: "Marketplace",
     featureMarketplaceText:
-      "5 agents across Base, Arc Testnet, and Arc Mainnet — USDC price set live by x402 (HTTP 402).",
+      "Browse agents across Base, Arc Testnet, and Arc Mainnet — USDC prices are quoted live by x402 (HTTP 402).",
     featureStudioTitle: "Studio",
     featureStudioText:
       "Enter a prompt, pay via x402 nanopayment, get your result formatted as an X thread.",
@@ -41,8 +41,7 @@ export const en = {
     agentsTitle: "Available agents",
     agentsHint: "Prices shown are estimates — actual x402 price is set when you run.",
     perRequest: "USDC / call",
-    footer:
-      "Powered by Circle Programmable Wallets · x402 · Arc Mainnet · Clerk Auth",
+    footer: "Powered by Circle Programmable Wallets · x402 · Arc Mainnet · Clerk Auth",
     signIn: "Sign in",
     signUpFree: "Get started free",
   },
@@ -71,7 +70,8 @@ export const en = {
   },
   agents: {
     perplexity: {
-      description: "Macro & political news, long X threads (~0.01 USDC/call). Prompt in English or Vietnamese.",
+      description:
+        "Macro & political news, long X threads (~0.01 USDC/call). Prompt in English or Vietnamese.",
       category: "Search & News",
     },
     surf: {
@@ -80,8 +80,7 @@ export const en = {
       category: "Prediction Markets",
     },
     stackB: {
-      description:
-        "One-click alt research (~0.11 USDC): Exa + vaults.fyi + Gloria ticker news ×3.",
+      description: "One-click alt research (~0.11 USDC): Exa + vaults.fyi + Gloria ticker news ×3.",
       category: "Research Stack",
     },
     arcMarketPulse: {
@@ -109,6 +108,11 @@ export const en = {
         "CCTP bridge volume, wallet flows, contract activity on Arc Mainnet. Deep-dive onchain analytics. ~0.02 USDC/run.",
       category: "Arc Mainnet",
     },
+    loneStarNews: {
+      description:
+        "AI crypto and macro headline sentiment with bullish/bearish distribution. Direct x402 payment on Arc Mainnet, about 0.05 USDC per call.",
+      category: "Crypto Sentiment",
+    },
   },
   studio: {
     badge: "Studio",
@@ -131,6 +135,8 @@ export const en = {
       "Mid-cap altcoin scan: L1/L2/DeFi narratives, TVL rotation, unlocks (STRICT — no BTC, ETH, BNB, XRP, stables).",
     defaultPromptArcSonar:
       "Explain Arc Testnet: USDC as native gas, nanopayments for AI agents, and why Circle built an L1 for stablecoins.",
+    defaultPromptLoneStarNews:
+      "Research why altcoins have pumped recently. Summarize crypto and macro headline sentiment, likely catalysts, and clearly separate confirmed news from speculation.",
     promptLabel: "Your prompt",
     agentNoteSurfNews:
       "**Polymarket Pulse** returns live crypto prediction market odds (~0.001 USDC/run). No prompt needed — click Run Agent for the latest crypto up/down sentiment from Polymarket via nano.blockrun.ai. For custom search queries, use **Web Search Writer**.",
@@ -250,8 +256,7 @@ export const en = {
     gasRequiredDesc:
       "Deposit to Gateway runs an on-chain transaction from your embedded wallet. Base charges gas in ETH (not USDC). Send ~{{recommended}} ETH on Base to {{address}}. You have {{eth}} ETH now.",
     insufficientUsdcTitle: "Not enough USDC on-chain",
-    insufficientUsdcInline:
-      "On-chain USDC on Base: {{have}} — less than deposit amount {{want}}.",
+    insufficientUsdcInline: "On-chain USDC on Base: {{have}} — less than deposit amount {{want}}.",
     onChainHint: "On-chain wallet (Base): {{usdc}} USDC · {{eth}} ETH for gas",
   },
   arcTools: {
@@ -283,7 +288,8 @@ export const en = {
     runBridge: "Bridge USDC (CCTP)",
     swapHelp: "Same-chain stablecoin swap on Arc Testnet via Circle App Kit (USDC ↔ EURC).",
     runSwap: "Swap on Arc",
-    defiHelp: "Official Arc ecosystem tools — explorer, docs, CCTP guides, and Circle developer kits.",
+    defiHelp:
+      "Official Arc ecosystem tools — explorer, docs, CCTP guides, and Circle developer kits.",
     needFaucetFirst: "Not enough USDC on Arc — use the Faucet tab first.",
     toolFaucet: "Circle Faucet",
     toolFaucetDesc: "Free testnet USDC for Arc, Base Sepolia, and more.",
@@ -336,6 +342,11 @@ export const en = {
     perplexityEmpty: "🌍 [MACRO NEWS]\nNo search content returned.",
     surfHeader: "🏄 [SURF CRYPTO FEED]",
     surfEmpty: "🏄 [SURF CRYPTO FEED]\nNo curated feed content returned.",
+    loneStarHeader: "🧭 [CRYPTO NEWS SENTIMENT]",
+    loneStarEmpty: "No crypto/news sentiment data returned.",
+    sentimentDistribution: "Sentiment",
+    sentimentAggregate: "Aggregate signal",
+    sentimentHeadlines: "Supporting headlines",
     responseEmpty: "Empty response.",
   },
   hints: {
@@ -347,6 +358,8 @@ export const en = {
       "Stack B: **alt-only** (~0.11 USDC) — Exa narratives → vaults.fyi yields → Gloria news ×3. Hard-excludes BTC, ETH, BNB, XRP & stables.",
     arcSonarFull:
       "Arc Sonar Brief sends your prompt to Perplexity Sonar via x402. Prefer questions about Arc, USDC gas, or Circle stablecoin rails.",
+    loneStarNewsFull:
+      "LoneStarOracle returns a crypto/news sentiment signal and supporting headlines. Ask about a token or market move; the quote is confirmed by x402 before payment. Keep enough USDC on Arc Mainnet for settlement.",
   },
   meta: {
     homeTitle: "Nano.Agent — x402 AI agents paid with USDC",
